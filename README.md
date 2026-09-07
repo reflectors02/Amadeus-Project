@@ -1077,3 +1077,13 @@ These endpoints provide the interface between the frontend and the Python backen
 # Notes
 
 Amadeus is a personal experimental project under active development. APIs, model formats, dependencies, and project structure may change as the system evolves.
+
+---
+
+# License
+
+Original Amadeus project code is licensed under the [MIT License](LICENSE).
+
+Third-party components and assets—including the Live2D Cubism SDK, character
+models, artwork, voice recordings, and model weights—are not covered by this
+MIT license and remain subject to their respective licenses and permissions.

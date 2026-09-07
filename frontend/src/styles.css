@@ -246,7 +246,7 @@ button {
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: minmax(88px, auto) minmax(0, 1fr) auto;
+  grid-template-rows: minmax(88px, auto) minmax(0, 1fr) auto auto;
   background: rgba(8, 11, 17, 0.7);
 }
 
@@ -409,7 +409,7 @@ button {
 }
 
 .composer {
-  margin: 0 clamp(18px, 3vw, 48px) 28px;
+  margin: 0 clamp(18px, 3vw, 48px) 12px;
   padding: 8px;
   display: grid;
   grid-template-columns: 1fr auto;
@@ -676,4 +676,28 @@ button {
 
 .touch-button:focus-visible {
   outline: 2px solid white;
+}
+
+/* A quiet build signature beneath the message composer. */
+.build-label {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  padding: 0 clamp(18px, 3vw, 48px) 12px;
+  color: #818c9d;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 9px;
+  line-height: 16px;
+  letter-spacing: 0.16em;
+  pointer-events: none;
+}
+
+.build-dot {
+  width: 5px;
+  height: 5px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #b89a63;
+  box-shadow: 0 0 7px rgba(184, 154, 99, 0.25);
 }

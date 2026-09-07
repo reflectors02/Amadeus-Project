@@ -1,0 +1,110 @@
+diff --git a/LICENSE b/LICENSE
+new file mode 100644
+index 0000000..7099e34
+--- /dev/null
++++ b/LICENSE
+@@ -0,0 +1,21 @@
++MIT License
++
++Copyright (c) 2026 reflectors02
++
++Permission is hereby granted, free of charge, to any person obtaining a copy
++of this software and associated documentation files (the "Software"), to deal
++in the Software without restriction, including without limitation the rights
++to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++copies of the Software, and to permit persons to whom the Software is
++furnished to do so, subject to the following conditions:
++
++The above copyright notice and this permission notice shall be included in all
++copies or substantial portions of the Software.
++
++THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
++SOFTWARE.
+diff --git a/README.md b/README.md
+index cafd056..12f947d 100644
+--- a/README.md
++++ b/README.md
+@@ -1077,3 +1077,13 @@ These endpoints provide the interface between the frontend and the Python backen
+ # Notes
+ 
+ Amadeus is a personal experimental project under active development. APIs, model formats, dependencies, and project structure may change as the system evolves.
++
++---
++
++# License
++
++Original Amadeus project code is licensed under the [MIT License](LICENSE).
++
++Third-party components and assets—including the Live2D Cubism SDK, character
++models, artwork, voice recordings, and model weights—are not covered by this
++MIT license and remain subject to their respective licenses and permissions.
+diff --git a/frontend/src/App.tsx b/frontend/src/App.tsx
+index d0c7a49..6a3c825 100644
+--- a/frontend/src/App.tsx
++++ b/frontend/src/App.tsx
+@@ -501,6 +501,10 @@ export default function App() {
+             Send
+           </button>
+         </form>
++        <div className="build-label">
++          <span className="build-dot" aria-hidden="true" />
++          DEVELOPER BUILD
++        </div>
+       </section>
+ 
+       {/* Settings Modal */}
+diff --git a/frontend/src/styles.css b/frontend/src/styles.css
+index 46a4f55..8d1da50 100644
+--- a/frontend/src/styles.css
++++ b/frontend/src/styles.css
+@@ -246,7 +246,7 @@ button {
+   min-width: 0;
+   min-height: 0;
+   display: grid;
+-  grid-template-rows: minmax(88px, auto) minmax(0, 1fr) auto;
++  grid-template-rows: minmax(88px, auto) minmax(0, 1fr) auto auto;
+   background: rgba(8, 11, 17, 0.7);
+ }
+ 
+@@ -409,7 +409,7 @@ button {
+ }
+ 
+ .composer {
+-  margin: 0 clamp(18px, 3vw, 48px) 28px;
++  margin: 0 clamp(18px, 3vw, 48px) 12px;
+   padding: 8px;
+   display: grid;
+   grid-template-columns: 1fr auto;
+@@ -677,3 +677,27 @@ button {
+ .touch-button:focus-visible {
+   outline: 2px solid white;
+ }
++
++/* A quiet build signature beneath the message composer. */
++.build-label {
++  display: flex;
++  align-items: center;
++  justify-content: flex-end;
++  gap: 7px;
++  padding: 0 clamp(18px, 3vw, 48px) 12px;
++  color: #818c9d;
++  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
++  font-size: 9px;
++  line-height: 16px;
++  letter-spacing: 0.16em;
++  pointer-events: none;
++}
++
++.build-dot {
++  width: 5px;
++  height: 5px;
++  flex-shrink: 0;
++  border-radius: 50%;
++  background: #b89a63;
++  box-shadow: 0 0 7px rgba(184, 154, 99, 0.25);
++}

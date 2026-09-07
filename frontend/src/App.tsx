@@ -501,6 +501,10 @@ export default function App() {
             Send
           </button>
         </form>
+        <div className="build-label">
+          <span className="build-dot" aria-hidden="true" />
+          DEVELOPER BUILD
+        </div>
       </section>
 
       {/* Settings Modal */}
