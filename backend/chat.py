@@ -179,3 +179,11 @@ def SpecialInteraction(interaction_value: int) -> dict:
     store.append_message("assistant", response);    
     return {"response": response, "audio_url": variant.get("audio_url")}
 
+# pre:
+# - hourlu
+def HourlyAnnouncement(hourly_id: int) -> dict:
+    response_pack = HOURLY_ANNOUNCEMENTS.get(hourly_id)
+    response = response_pack["text"]
+    audio_url = response_pack["audio_url"]
+    store.append_message("assistant, response")
+    return {"response": response, "audio_url": audio_url}
