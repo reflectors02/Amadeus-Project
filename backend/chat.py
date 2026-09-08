@@ -70,14 +70,15 @@ def get_raw_memory():
 
 
 class AmadeusPack(BaseModel):
-    assistant_reply_ENG: str = Field(..., description="English text to show in UI. May include stage directions.")
     assistant_reply_JPS: str = Field(..., description=(
-        "Japanese TTS text only. Must be plain spoken Japanese."
+        "PRIMARY response: Kurisu's dialogue written natively in Japanese, as she would actually speak it. "
+        "Must be plain spoken Japanese for TTS."
         " Allowed: Japanese characters, ASCII letters/digits if needed, and these punctuation marks only: 、。！？"
         " Newlines are allowed. Do NOT include: parentheses/brackets/quotes/asterisks/emojis/markdown/ellipses (…)/colons/semicolons."
         " Avoid long dashes and repeated punctuation.")
     )
-    
+    assistant_reply_ENG: str = Field(..., description="English translation of assistant_reply_JPS, shown in the UI for the user to read. May include stage directions.")
+
 
 # pre:
 # - message_context is a List[Dict[str, str]] with keys: "role" and "content"
@@ -87,8 +88,8 @@ class AmadeusPack(BaseModel):
 #
 # post:
 # - returns an AmadeusPack with:
-#     - assistant_reply_ENG: English UI text (may include stage directions)
-#     - assistant_reply_JPS: Japanese TTS-safe speech text (no stage directions)
+#     - assistant_reply_JPS: Japanese dialogue written natively (primary, for TTS)
+#     - assistant_reply_ENG: English translation of it, for the UI
 # - exactly ONE LLM call is made under normal operation
 # - on structured output failure, falls back to a plain LLM call with a safe default Japanese reply
 def getResponsePacked(message_context, internal_context=None) -> AmadeusPack:
@@ -97,12 +98,14 @@ def getResponsePacked(message_context, internal_context=None) -> AmadeusPack:
     # IMPORTANT: Add a system rule that tells the model exactly what to output.
     pack_rules = {
         "role": "system",
-        "content": (
+         "content": (
             "Write only Kurisu's spoken dialogue. "
             "Do not include narration, stage directions, actions, facial expressions, "
             "body language, or inner thoughts in either response. "
-            "assistant_reply_ENG should be natural English dialogue. "
-            "assistant_reply_JPS should be the same response in natural spoken Japanese for TTS. "
+            "FIRST write assistant_reply_JPS natively in Japanese: think and speak the way a native "
+            "Japanese speaker (Makise Kurisu) really would — natural, idiomatic spoken Japanese, "
+            "NOT a word-for-word translation from English. "
+            "THEN write assistant_reply_ENG as an English translation of that Japanese dialogue, for the user to read. "
             "Keep the meaning and tone consistent between both languages."
         ),
     }
@@ -140,8 +143,8 @@ def getResponsePacked(message_context, internal_context=None) -> AmadeusPack:
 # - calls getResponsePacked(...) exactly once
 # - appends assistant_reply_ENG to memory
 # - returns an AmadeusPack containing:
-#     - assistant_reply_ENG (English UI text)
-#     - assistant_reply_JPS (Japanese TTS-safe speech text)
+#     - assistant_reply_JPS (native Japanese dialogue, for TTS)
+#     - assistant_reply_ENG (English translation, for the UI)
 def getOutputPacked(user_message: str) -> AmadeusPack:
     # Snapshot the previous turn before the new message becomes the latest one.
     internal_context = store.load_internal_context()
