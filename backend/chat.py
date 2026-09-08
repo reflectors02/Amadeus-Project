@@ -77,7 +77,7 @@ class AmadeusPack(BaseModel):
         " Newlines are allowed. Do NOT include: parentheses/brackets/quotes/asterisks/emojis/markdown/ellipses (…)/colons/semicolons."
         " Avoid long dashes and repeated punctuation.")
     )
-    assistant_reply_ENG: str = Field(..., description="English translation of assistant_reply_JPS, shown in the UI for the user to read. May include stage directions.")
+    assistant_reply_ENG: str = Field(..., description="English translation of assistant_reply_JPS, shown in the UI for the user to read.")
 
 
 # pre:
