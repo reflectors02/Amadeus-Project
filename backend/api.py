@@ -272,3 +272,7 @@ def doSpecialInteraction():
         }
 
     return jsonify({"status": "ok", **reply})
+
+
+import message_actions
+message_actions.install(application)

@@ -225,6 +225,7 @@ def reset_memory() -> None:
     _ensure_messages_table(c)
 
     c.execute("DELETE FROM messages")
+    c.execute("DROP TABLE IF EXISTS message_versions")
 
     conn.commit()
     conn.close()

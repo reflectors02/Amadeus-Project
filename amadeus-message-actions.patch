@@ -1,0 +1,503 @@
+diff --git a/backend/api.py b/backend/api.py
+--- a/backend/api.py
++++ b/backend/api.py
+@@ -272,3 +272,7 @@
+         }
+ 
+     return jsonify({"status": "ok", **reply})
++
++
++import message_actions
++message_actions.install(application)
+diff --git a/backend/memory.py b/backend/memory.py
+--- a/backend/memory.py
++++ b/backend/memory.py
+@@ -225,6 +225,7 @@
+     _ensure_messages_table(c)
+ 
+     c.execute("DELETE FROM messages")
++    c.execute("DROP TABLE IF EXISTS message_versions")
+ 
+     conn.commit()
+     conn.close()
+diff --git a/backend/message_actions.py b/backend/message_actions.py
+new file mode 100644
+--- /dev/null
++++ b/backend/message_actions.py
+@@ -0,0 +1,176 @@
++"""Message controls adapted from cmh95209's feature branch (MIT).
++
++Versions belong to one stable message ID, so deleting adjacent messages never
++merges unrelated reply versions. Only the final reply can be regenerated.
++"""
++from contextlib import contextmanager
++import sqlite3
++import threading
++
++from flask import g, jsonify, request
++import chat
++import memory as store
++import preferences
++
++_lock = threading.Lock()
++
++
++@contextmanager
++def database():
++    conn = sqlite3.connect(store.PATH_TO_MEMORY)
++    conn.row_factory = sqlite3.Row
++    try:
++        store._ensure_messages_table(conn.cursor())
++        conn.execute("""CREATE TABLE IF NOT EXISTS message_versions (
++            id INTEGER PRIMARY KEY AUTOINCREMENT,
++            message_id INTEGER NOT NULL,
++            content TEXT NOT NULL,
++            japanese TEXT,
++            audio_url TEXT,
++            active INTEGER NOT NULL DEFAULT 0
++        )""")
++        conn.commit()
++        yield conn
++        conn.commit()
++    except Exception:
++        conn.rollback()
++        raise
++    finally:
++        conn.close()
++
++
++def history():
++    with database() as conn:
++        rows = conn.execute("SELECT * FROM messages ORDER BY id").fetchall()
++        versions = conn.execute(
++            "SELECT id, message_id, active FROM message_versions ORDER BY id"
++        ).fetchall()
++    groups = {}
++    for version in versions:
++        groups.setdefault(version["message_id"], []).append(version)
++    result = []
++    for row in rows:
++        item = dict(id=row["id"], role=row["role"], content=row["content"],
++                    created_at=row["created_at"],
++                    can_replay=bool(row["japanese"] or row["audio_url"]))
++        siblings = groups.get(row["id"], [])
++        if siblings:
++            item["version_ids"] = [v["id"] for v in siblings]
++            item["version"] = next(
++                (i + 1 for i, v in enumerate(siblings) if v["active"]), 1)
++        result.append(item)
++    return result
++
++
++def snapshot(conn):
++    return [tuple(r) for r in conn.execute("SELECT * FROM messages ORDER BY id")]
++
++
++def add_version(conn, message_id, content, japanese, audio_url):
++    conn.execute("UPDATE message_versions SET active = 0 WHERE message_id = ?",
++                 (message_id,))
++    conn.execute("""INSERT INTO message_versions
++        (message_id, content, japanese, audio_url, active) VALUES (?, ?, ?, ?, 1)""",
++        (message_id, content, japanese, audio_url))
++    conn.execute("UPDATE messages SET content = ?, japanese = ?, audio_url = ? WHERE id = ?",
++                 (content, japanese, audio_url, message_id))
++
++
++def install(app):
++    # Serialize conversation mutations across browser tabs in the Flask process.
++    @app.before_request
++    def acquire_conversation():
++        paths = {"/", "/memory_reset", "/doSpecialInteraction"}
++        if request.method == "POST" and (
++                request.path in paths or request.path.startswith("/messages/")):
++            if not _lock.acquire(blocking=False):
++                return jsonify(message="Another conversation action is running. Try again."), 409
++            g.message_action_lock = True
++
++    @app.teardown_request
++    def release_conversation(error=None):
++        if g.pop("message_action_lock", False):
++            _lock.release()
++
++    @app.after_request
++    def include_history(response):
++        if response.status_code == 200 and request.endpoint in {
++                "request_message", "doSpecialInteraction", "getMemory"}:
++            payload = response.get_json()
++            payload["messages"] = history()
++            response.set_data(app.json.dumps(payload))
++            response.headers["Cache-Control"] = "no-store"
++        return response
++
++    @app.post("/messages/<int:message_id>/<action>")
++    def message_action(message_id, action):
++        if action not in {"edit", "delete", "regenerate", "version"}:
++            return jsonify(message="Unknown message action."), 404
++        data = request.get_json(silent=True)
++        if not isinstance(data, dict):
++            return jsonify(message="Expected a JSON object."), 400
++
++        with database() as conn:
++            conn.execute("BEGIN IMMEDIATE")
++            row = conn.execute("SELECT * FROM messages WHERE id = ?", (message_id,)).fetchone()
++            if row is None:
++                return jsonify(message="Message no longer exists. Reload the conversation."), 404
++            if row["role"] not in {"user", "assistant"}:
++                return jsonify(message="This message cannot be changed."), 400
++
++            if action == "delete":
++                conn.execute("DELETE FROM message_versions WHERE message_id = ?", (message_id,))
++                conn.execute("DELETE FROM messages WHERE id = ?", (message_id,))
++            elif action == "edit":
++                content = data.get("content")
++                if not isinstance(content, str) or not content.strip():
++                    return jsonify(message="Enter a message before saving."), 400
++                content = content.strip()
++                if content != row["content"]:
++                    # English edits invalidate the old Japanese/recording.
++                    conn.execute("UPDATE messages SET content = ?, japanese = NULL, audio_url = NULL WHERE id = ?",
++                                 (content, message_id))
++                    conn.execute("UPDATE message_versions SET content = ?, japanese = NULL, audio_url = NULL WHERE message_id = ? AND active = 1",
++                                 (content, message_id))
++            elif action == "version":
++                version_id = data.get("version_id")
++                if type(version_id) is not int:
++                    return jsonify(message="Invalid reply version."), 400
++                version = conn.execute("SELECT * FROM message_versions WHERE id = ? AND message_id = ?",
++                                       (version_id, message_id)).fetchone()
++                if version is None:
++                    return jsonify(message="Reply version not found."), 404
++                conn.execute("UPDATE message_versions SET active = (id = ?) WHERE message_id = ?",
++                             (version_id, message_id))
++                conn.execute("UPDATE messages SET content = ?, japanese = ?, audio_url = ? WHERE id = ?",
++                             (version["content"], version["japanese"], version["audio_url"], message_id))
++            else:
++                if not chat.has_api_key():
++                    return jsonify(message="Add an OpenRouter API key in Settings."), 400
++                messages = conn.execute("SELECT id, role, content FROM messages ORDER BY id").fetchall()
++                if (len(messages) < 2 or messages[-1]["id"] != message_id
++                        or row["role"] != "assistant" or messages[-2]["role"] != "user"):
++                    return jsonify(message="Regenerate the final reply after a user message."), 409
++                before = snapshot(conn)
++                context = [dict(role=m["role"], content=m["content"]) for m in messages[:-1]]
++
++        if action == "regenerate":
++            # Do not change the old reply until generation succeeds.
++            context = preferences.trim_history(context, preferences.load()["context_budget"])
++            try:
++                pack = chat.getResponsePacked(context, internal_context={
++                    "role": "system",
++                    "content": "Regenerate the reply to the final user message. Do not treat this as a new arrival or absence."
++                })
++            except Exception:
++                app.logger.exception("Reply regeneration failed")
++                return jsonify(message="Regeneration failed. Your previous reply is unchanged."), 502
++            with database() as conn:
++                conn.execute("BEGIN IMMEDIATE")
++                if snapshot(conn) != before:
++                    return jsonify(message="Conversation changed during generation. Please try again."), 409
++                if not conn.execute("SELECT 1 FROM message_versions WHERE message_id = ?", (message_id,)).fetchone():
++                    add_version(conn, message_id, row["content"], row["japanese"], row["audio_url"])
++                add_version(conn, message_id, pack.assistant_reply_ENG, pack.assistant_reply_JPS, None)
++
++        return jsonify(messages=history())
+diff --git a/frontend/src/api.ts b/frontend/src/api.ts
+--- a/frontend/src/api.ts
++++ b/frontend/src/api.ts
+@@ -1,5 +1,7 @@
+ export type MemoryMessage = {
+   id?: number;
++  version_ids?: number[];
++  version?: number;
+   can_replay?: boolean;
+   role: string;
+   content: string;
+@@ -7,12 +9,13 @@
+ };
+ 
+ export type MessageReply = {
++  messages?: MemoryMessage[];
+   messageId?: number;
+   response: string;
+   speechUrl?: string;
+ };
+ 
+-const API_BASE = "http://127.0.0.1:5050";
++export const API_BASE = "http://127.0.0.1:5050";
+ 
+ export async function getPersonality(): Promise<string> {
+   const data = await parseResponse(await fetch(`${API_BASE}/getPersonality`, { cache: "no-store" }));
+@@ -74,6 +77,7 @@
+   }
+ 
+   return {
++    messages: Array.isArray(data.messages) ? data.messages : undefined,
+     response: data.response,
+     messageId: typeof data.message_id === "number" ? data.message_id : undefined,
+     speechUrl:
+@@ -141,6 +145,7 @@
+   const data = await parseResponse(response);
+   if (typeof data.response !== "string") throw new Error("Invalid interaction response");
+   return {
++    messages: Array.isArray(data.messages) ? data.messages : undefined,
+     response: data.response,
+     messageId: typeof data.message_id === "number" ? data.message_id : undefined,
+     speechUrl:
+diff --git a/frontend/src/App.tsx b/frontend/src/App.tsx
+--- a/frontend/src/App.tsx
++++ b/frontend/src/App.tsx
+@@ -1,5 +1,6 @@
+ import { FormEvent, useEffect, useRef, useState } from "react";
+ import Live2DCharacter from "./components/Live2DCharacter";
++import MessageActions from "./components/MessageActions";
+ import type { Live2DCharacterHandle } from "./components/Live2DCharacter";
+ import {
+   getCurrentModel,
+@@ -248,6 +249,7 @@
+         },
+       ]);
+ 
++      if (reply.messages) setMessages(reply.messages);
+       setStatus("Online");
+       if (reply.speechUrl && await speechReady) {
+         void characterRef.current?.playSpeech(reply.speechUrl).catch((error) => {
+@@ -366,6 +368,7 @@
+         },
+       ]);
+ 
++      if (reply.messages) setMessages(reply.messages);
+       setStatus("Online");
+       if (reply.speechUrl && await speechReady) {
+         void characterRef.current?.playSpeech(reply.speechUrl).catch((error) => {
+@@ -492,7 +495,7 @@
+ 
+           {messages.map((message, index) => (
+             <article
+-              key={`${message.created_at ?? "message"}-${index}`}
++              key={message.id ?? `pending-${index}`}
+               className={`message ${
+                 message.role === "user"
+                   ? "user"
+@@ -514,27 +517,16 @@
+               <div className="bubble">
+                 {message.content}
+               </div>
+-              {message.role === "assistant" && message.id && message.can_replay && (
+-                <button type="button" className="ghost-button replay-button"
+-                  disabled={loading || replaying !== null}
+-                  aria-label={`Replay voice for reply ${index + 1}`}
+-                  title={replaying === message.id ? "Loading voice..." : "Replay voice"}
+-                  aria-busy={replaying === message.id}
+-                  onClick={() => void replayVoice(message)}>
+-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none"
+-                    stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"
+-                    aria-hidden="true" focusable="false">
+-                    {replaying === message.id ? (
+-                      <circle cx="12" cy="12" r="8" strokeDasharray="30 20" className="replay-spinner" />
+-                    ) : (
+-                      <>
+-                        <path d="M11 5 6 9H3v6h3l5 4V5Z" />
+-                        <path d="M15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14" />
+-                      </>
+-                    )}
+-                  </svg>
+-                </button>
+-              )}
++              <MessageActions message={message}
++                busy={loading || replaying !== null}
++                canRegenerate={message.role === "assistant" && index === messages.length - 1
++                  && index > 0 && messages[index - 1].role === "user"}
++                onBusy={setLoading} onMessages={setMessages} onStatus={setStatus}
++                onStop={() => characterRef.current?.stopSpeech()}
++                onReplay={() => replayVoice(message)}
++                onPrepare={() => characterRef.current?.prepareSpeech() ?? Promise.resolve()}
++                onPlay={() => message.id == null ? Promise.resolve()
++                  : characterRef.current?.playSpeech(messageAudioUrl(message.id)) ?? Promise.resolve()} />
+             </article>
+           ))}
+ 
+diff --git a/frontend/src/components/MessageActions.tsx b/frontend/src/components/MessageActions.tsx
+new file mode 100644
+--- /dev/null
++++ b/frontend/src/components/MessageActions.tsx
+@@ -0,0 +1,134 @@
++import { useRef, useState } from "react";
++import { API_BASE, type MemoryMessage } from "../api";
++import "./MessageActions.css";
++
++type Props = {
++  message: MemoryMessage;
++  busy: boolean;
++  canRegenerate: boolean;
++  onBusy: (busy: boolean) => void;
++  onMessages: (messages: MemoryMessage[]) => void;
++  onStatus: (status: string) => void;
++  onStop: () => void;
++  onReplay: () => Promise<void>;
++  onPrepare: () => Promise<void>;
++  onPlay: () => Promise<void>;
++};
++
++export default function MessageActions({
++  message, busy, canRegenerate, onBusy, onMessages, onStatus,
++  onStop, onReplay, onPrepare, onPlay,
++}: Props) {
++  const [editing, setEditing] = useState(false);
++  const [draft, setDraft] = useState("");
++  const [error, setError] = useState("");
++  const working = useRef(false);
++  const versions = message.version_ids ?? [];
++  const version = message.version ?? 1;
++
++  async function act(action: string, data: Record<string, unknown> = {}) {
++    if (busy || working.current || message.id == null) return;
++    if (action === "delete" && !window.confirm(
++      "Delete this message and all its reply versions from memory? Later messages will stay."
++    )) return;
++    working.current = true;
++    onBusy(true);
++    onStop();
++    setError("");
++    const ready = action === "regenerate"
++      ? onPrepare().then(() => true, () => false)
++      : Promise.resolve(false);
++    onStatus(action === "regenerate" ? "Amadeus is rethinking..." : "Updating message...");
++    try {
++      const response = await fetch(`${API_BASE}/messages/${message.id}/${action}`, {
++        method: "POST",
++        headers: { "Content-Type": "application/json" },
++        body: JSON.stringify(data),
++      });
++      const result = await response.json();
++      if (!response.ok) throw new Error(result.message || "Message action failed");
++      if (!Array.isArray(result.messages)) throw new Error("Invalid conversation response");
++      onMessages(result.messages);
++      setEditing(false);
++      onStatus("Online");
++      if (action === "regenerate") {
++        if (await ready) {
++          try {
++            await onPlay();
++          } catch {
++            onStatus("Reply saved, but audio failed. Try Replay.");
++          }
++        } else {
++          onStatus("Reply saved. Use Replay to start its voice.");
++        }
++      }
++    } catch (cause) {
++      const text = cause instanceof Error ? cause.message : "Message action failed";
++      setError(text);
++      onStatus(text);
++    } finally {
++      working.current = false;
++      onBusy(false);
++    }
++  }
++
++  if (message.id == null || !["user", "assistant"].includes(message.role)) return null;
++
++  return (
++    <div className="message-controls">
++      <div className="message-actions" role="group" aria-label="Message actions">
++        {message.role === "assistant" && message.can_replay && (
++          <button type="button" disabled={busy || editing} title="Replay voice"
++            onClick={() => void onReplay()}>🔊 Replay</button>
++        )}
++        {canRegenerate && (
++          <button type="button" disabled={busy || editing} title="Generate another reply"
++            onClick={() => void act("regenerate")}>↻ Regenerate</button>
++        )}
++        <button type="button" disabled={busy || editing} title="Edit this message"
++          onClick={() => {
++            onStop();
++            setDraft(message.content);
++            setError("");
++            setEditing(true);
++          }}>✏️ Edit</button>
++        <button type="button" disabled={busy || editing} title="Delete this message"
++          onClick={() => void act("delete")}>🗑️ Delete</button>
++        {versions.length > 1 && (
++          <span className="version-nav" aria-label="Reply versions">
++            <button type="button" aria-label="Previous reply version"
++              disabled={busy || editing || version <= 1}
++              onClick={() => void act("version", { version_id: versions[version - 2] })}>◀</button>
++            <span className="version-count">{version}/{versions.length}</span>
++            <button type="button" aria-label="Next reply version"
++              disabled={busy || editing || version >= versions.length}
++              onClick={() => void act("version", { version_id: versions[version] })}>▶</button>
++          </span>
++        )}
++      </div>
++      {editing && (
++        <div className="message-edit">
++          <textarea autoFocus rows={3} value={draft} disabled={busy}
++            aria-label="Edit message"
++            onChange={(event) => setDraft(event.target.value)}
++            onKeyDown={(event) => {
++              if (busy) return;
++              if (event.key === "Escape") setEditing(false);
++              if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
++                event.preventDefault();
++                if (draft.trim()) void act("edit", { content: draft });
++              }
++            }} />
++          <p>Updates saved memory; later replies stay unchanged.
++            {message.role === "assistant" && " Changing the English text disables this version's old voice."}</p>
++          <div className="message-edit-actions">
++            <button type="button" disabled={busy || !draft.trim()}
++              onClick={() => void act("edit", { content: draft })}>Save</button>
++            <button type="button" disabled={busy} onClick={() => setEditing(false)}>Cancel</button>
++          </div>
++        </div>
++      )}
++      {error && <p className="settings-error" role="alert">{error}</p>}
++    </div>
++  );
++}
+diff --git a/frontend/src/components/MessageActions.css b/frontend/src/components/MessageActions.css
+new file mode 100644
+--- /dev/null
++++ b/frontend/src/components/MessageActions.css
+@@ -0,0 +1,41 @@
++/* Toolbar appearance adapted from cmh95209/Amadeus-Project (MIT). */
++.message-actions, .message-edit-actions {
++  display: flex;
++  align-items: center;
++  flex-wrap: wrap;
++  gap: 6px;
++  margin-top: 8px;
++}
++.message-actions button, .message-edit-actions button {
++  font-size: 11px;
++  letter-spacing: 0.04em;
++  color: #9aa7b8;
++  background: rgba(255, 255, 255, 0.03);
++  border: 1px solid rgba(255, 255, 255, 0.1);
++  border-radius: 6px;
++  padding: 2px 8px;
++  min-height: 28px;
++  cursor: pointer;
++  transition: opacity 0.15s ease, color 0.15s ease, border-color 0.15s ease;
++}
++.message-actions button:hover, .message-edit-actions button:hover {
++  color: #e6edf6;
++  border-color: rgba(255, 255, 255, 0.3);
++}
++.message-controls button:disabled { opacity: 0.3; cursor: default; }
++.message-controls button:focus-visible { outline: 2px solid #9aa7b8; outline-offset: 2px; }
++.version-nav { display: inline-flex; align-items: center; gap: 4px; }
++.version-count { color: #c7d2e0; font-size: 10px; min-width: 24px; text-align: center; }
++.message-edit { margin-top: 8px; }
++.message-edit textarea {
++  width: 100%; resize: vertical; padding: 10px; color: #e6edf6;
++  background: #101722; border: 1px solid #394658; border-radius: 6px;
++}
++.message-edit p { color: #9aa7b8; font-size: 12px; line-height: 1.5; }
++@media (hover: hover) and (pointer: fine) {
++  .message-actions { opacity: 0; transition: opacity 0.15s ease; }
++  .message:hover .message-actions, .message:focus-within .message-actions { opacity: 1; }
++}
++@media (pointer: coarse) {
++  .message-actions button, .message-edit-actions button { min-height: 44px; }
++}

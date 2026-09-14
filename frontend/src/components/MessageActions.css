@@ -1,0 +1,41 @@
+/* Toolbar appearance adapted from cmh95209/Amadeus-Project (MIT). */
+.message-actions, .message-edit-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.message-actions button, .message-edit-actions button {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: #9aa7b8;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 2px 8px;
+  min-height: 28px;
+  cursor: pointer;
+  transition: opacity 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.message-actions button:hover, .message-edit-actions button:hover {
+  color: #e6edf6;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+.message-controls button:disabled { opacity: 0.3; cursor: default; }
+.message-controls button:focus-visible { outline: 2px solid #9aa7b8; outline-offset: 2px; }
+.version-nav { display: inline-flex; align-items: center; gap: 4px; }
+.version-count { color: #c7d2e0; font-size: 10px; min-width: 24px; text-align: center; }
+.message-edit { margin-top: 8px; }
+.message-edit textarea {
+  width: 100%; resize: vertical; padding: 10px; color: #e6edf6;
+  background: #101722; border: 1px solid #394658; border-radius: 6px;
+}
+.message-edit p { color: #9aa7b8; font-size: 12px; line-height: 1.5; }
+@media (hover: hover) and (pointer: fine) {
+  .message-actions { opacity: 0; transition: opacity 0.15s ease; }
+  .message:hover .message-actions, .message:focus-within .message-actions { opacity: 1; }
+}
+@media (pointer: coarse) {
+  .message-actions button, .message-edit-actions button { min-height: 44px; }
+}

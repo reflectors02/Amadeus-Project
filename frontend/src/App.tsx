@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import Live2DCharacter from "./components/Live2DCharacter";
+import MessageActions from "./components/MessageActions";
 import type { Live2DCharacterHandle } from "./components/Live2DCharacter";
 import {
   getCurrentModel,
@@ -248,6 +249,7 @@ export default function App() {
         },
       ]);
 
+      if (reply.messages) setMessages(reply.messages);
       setStatus("Online");
       if (reply.speechUrl && await speechReady) {
         void characterRef.current?.playSpeech(reply.speechUrl).catch((error) => {
@@ -366,6 +368,7 @@ export default function App() {
         },
       ]);
 
+      if (reply.messages) setMessages(reply.messages);
       setStatus("Online");
       if (reply.speechUrl && await speechReady) {
         void characterRef.current?.playSpeech(reply.speechUrl).catch((error) => {
@@ -492,7 +495,7 @@ export default function App() {
 
           {messages.map((message, index) => (
             <article
-              key={`${message.created_at ?? "message"}-${index}`}
+              key={message.id ?? `pending-${index}`}
               className={`message ${
                 message.role === "user"
                   ? "user"
@@ -514,27 +517,16 @@ export default function App() {
               <div className="bubble">
                 {message.content}
               </div>
-              {message.role === "assistant" && message.id && message.can_replay && (
-                <button type="button" className="ghost-button replay-button"
-                  disabled={loading || replaying !== null}
-                  aria-label={`Replay voice for reply ${index + 1}`}
-                  title={replaying === message.id ? "Loading voice..." : "Replay voice"}
-                  aria-busy={replaying === message.id}
-                  onClick={() => void replayVoice(message)}>
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none"
-                    stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"
-                    aria-hidden="true" focusable="false">
-                    {replaying === message.id ? (
-                      <circle cx="12" cy="12" r="8" strokeDasharray="30 20" className="replay-spinner" />
-                    ) : (
-                      <>
-                        <path d="M11 5 6 9H3v6h3l5 4V5Z" />
-                        <path d="M15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14" />
-                      </>
-                    )}
-                  </svg>
-                </button>
-              )}
+              <MessageActions message={message}
+                busy={loading || replaying !== null}
+                canRegenerate={message.role === "assistant" && index === messages.length - 1
+                  && index > 0 && messages[index - 1].role === "user"}
+                onBusy={setLoading} onMessages={setMessages} onStatus={setStatus}
+                onStop={() => characterRef.current?.stopSpeech()}
+                onReplay={() => replayVoice(message)}
+                onPrepare={() => characterRef.current?.prepareSpeech() ?? Promise.resolve()}
+                onPlay={() => message.id == null ? Promise.resolve()
+                  : characterRef.current?.playSpeech(messageAudioUrl(message.id)) ?? Promise.resolve()} />
             </article>
           ))}
 

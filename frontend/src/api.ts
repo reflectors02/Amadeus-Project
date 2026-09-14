@@ -1,5 +1,7 @@
 export type MemoryMessage = {
   id?: number;
+  version_ids?: number[];
+  version?: number;
   can_replay?: boolean;
   role: string;
   content: string;
@@ -7,12 +9,13 @@ export type MemoryMessage = {
 };
 
 export type MessageReply = {
+  messages?: MemoryMessage[];
   messageId?: number;
   response: string;
   speechUrl?: string;
 };
 
-const API_BASE = "http://127.0.0.1:5050";
+export const API_BASE = "http://127.0.0.1:5050";
 
 export async function getPersonality(): Promise<string> {
   const data = await parseResponse(await fetch(`${API_BASE}/getPersonality`, { cache: "no-store" }));
@@ -74,6 +77,7 @@ export async function sendMessage(userInput: string): Promise<MessageReply> {
   }
 
   return {
+    messages: Array.isArray(data.messages) ? data.messages : undefined,
     response: data.response,
     messageId: typeof data.message_id === "number" ? data.message_id : undefined,
     speechUrl:
@@ -141,6 +145,7 @@ export async function sendInteraction(interactionValue: number): Promise<Message
   const data = await parseResponse(response);
   if (typeof data.response !== "string") throw new Error("Invalid interaction response");
   return {
+    messages: Array.isArray(data.messages) ? data.messages : undefined,
     response: data.response,
     messageId: typeof data.message_id === "number" ? data.message_id : undefined,
     speechUrl:
