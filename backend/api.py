@@ -12,6 +12,7 @@ from chat import (
     SpecialInteraction,
     setPersonality,
     getPersonality,
+    toggle_search_online,
 )
 
 from tts import streamVoiceChunks
@@ -274,5 +275,30 @@ def doSpecialInteraction():
     return jsonify({"status": "ok", **reply})
 
 
+# pre: The "web" button from frontend will send in either a 1 or a 0
+#      1 represents requests online mode to be turned on
+#      0 represents requests online mode to be turned off
+#
+# post: use toggle_search_online() accordingly and set the model
+#       return status ok at the end
+@application.route("/toggleOnlineMode", methods=["POST"])
+def toggleOnlineMode():
+    print("[Flask] /toggleOnlineMode triggered")
+
+    data = request.get_json(silent=True) or {}
+
+    online_flag = data.get("online_flag", 0)
+
+    toggle_search_online(online_flag)
+
+    return jsonify({
+        "status": "ok",
+        "online": bool(online_flag)
+    })
+
+
+
+# don't touch this, i don't know what it does :)
+#   - reflectors
 import message_actions
 message_actions.install(application)

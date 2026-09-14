@@ -14,7 +14,6 @@ PATH_TO_MEMORY = os.path.join(DATA_DIR, "memory.db")
 PATH_TO_PERSONALITY = os.path.join(DATA_DIR, "personality.txt")
 PATH_TO_API_KEY = os.path.join(DATA_DIR, "api_key.txt")
 PATH_TO_LLM_MODEL = os.path.join(DATA_DIR, "llm_model.txt")
-#PATH_TO_TRANSLATION_INSTRUCTIONS = os.path.join(TXT_DIR, "translation_instructions.txt")
 
 DEFAULT_LLM_MODEL = "deepseek/deepseek-v3.2-exp"
 

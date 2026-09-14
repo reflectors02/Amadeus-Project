@@ -2,6 +2,9 @@
 
 Versions belong to one stable message ID, so deleting adjacent messages never
 merges unrelated reply versions. Only the final reply can be regenerated.
+
+"I have no idea how any of this works, but I think we won't need to touch it right? Well, if we do we can ask cmh""
+    -reflectors
 """
 from contextlib import contextmanager
 import sqlite3

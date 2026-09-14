@@ -8,29 +8,35 @@ import random
 default_LLM_Model = store.DEFAULT_LLM_MODEL
 API_KEY = store.load_api_key()
 LLM_Model = store.load_llm_model(default_model=default_LLM_Model)
+LLM_Model_Online = LLM_Model + ":online"
 
 
-#pre: The intended new_model is a string e.g., "deepseek/deepseek-v3.2-exp"
-#post: global LLM_Model should be changed to new_model
-#      LLM_Model.txt should be updated accordingly, to store the latest model the user chose.
+#   pre: The intended new_model is a string e.g., "deepseek/deepseek-v3.2-exp"
+#   post: global LLM_Model should be changed to new_model
+#         LLM_Model.txt should be updated accordingly, to store the latest model the user chose.
+#         should also change LLM_Model_Online accordingly
 def setLLMModel(new_model: str):
     global LLM_Model
+    global LLM_Model_Online
+
     LLM_Model = new_model.strip()
+    LLM_Model_Online = LLM_Model + ":online"
+    
     store.save_llm_model(LLM_Model)
     reset_llm()  # IMPORTANT: recreate ChatOpenAI with the new model
     print("[Amadeus] Model changed to " + LLM_Model)
 
 
-#pre:
-#post: If LLM_Model is empty, return an Error message
-#      else, return the LLM Model e.g., "deepseek/deepseek-v3.2-exp"
+#   pre:
+#   post: If LLM_Model is empty, return an Error message
+#         else, return the LLM Model e.g., "deepseek/deepseek-v3.2-exp"
 def getLLMModel():
     global LLM_Model
     return LLM_Model.strip() if LLM_Model else "No Model Selected."
 
 
-#pre: key_string is a string in the format: "sk-or-v1-566...."
-#post: API_KEY set to key_string
+#   pre: key_string is a string in the format: "sk-or-v1-566...."
+#   post: API_KEY set to key_string
 #      API_Key.txt should also be updated accordingly.
 def setKey(key_string: str):
     global API_KEY
@@ -41,9 +47,9 @@ def setKey(key_string: str):
     print("[Amadeus] API key updated")
 
 
-#pre: new_personality is new context for personality e.g., "This is Kurisu Makise....etc"
-#post: Should update personality.txt using store.save_personality.
-#      yes i know this is a bit round about, but to keep consistency.
+#   pre: new_personality is new context for personality e.g., "This is Kurisu Makise....etc"
+#   post: Should update personality.txt using store.save_personality.
+#           yes i know this is a bit round about, but to keep consistency.
 def setPersonality(new_personality: str):
     store.save_personality(new_personality)
     print("[Amadeus] Updated personality!")
@@ -57,17 +63,33 @@ def has_api_key() -> bool:
     return bool(API_KEY.strip())
 
 
-#pre:
-#post: memory.json should be erased
+#   pre:
+#   post: memory.json should be erased
 def resetMemory():
     store.reset_memory()
     print("[Amadeus] Memory Reset!")
 
 
-#pre:
-#post: returns a dict of JSON e.g., [{"role": "user", "content": "kurisu"....}....]
+#   pre:
+#   post: returns a dict of JSON e.g., [{"role": "user", "content": "kurisu"....}....]
 def get_raw_memory():
     return store.load_memory_raw()
+
+# pre: requested_flag is an integer, either 1 or 0.
+#      if requested_flag == 1, toggle online mode
+#      else, untoggle online mode if 0. 
+# post: 
+#      accordingly set the online mode by setting the LLM model again
+def toggle_search_online(requested_flag: int):
+    if requested_flag == 1:
+        store.save_llm_model(LLM_Model_Online)
+        print("[Amadeus] Toggled Online Mode to True")
+    else:
+        store.save_llm_model(LLM_Model)
+        print("[Amadeus] Toggled Online Mode to False")
+    reset_llm()
+
+
 
 
 class AmadeusPack(BaseModel):

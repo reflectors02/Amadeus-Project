@@ -1,1 +1,1 @@
-deepseek/deepseek-v4-flash
+z-ai/glm-5.3-flash
