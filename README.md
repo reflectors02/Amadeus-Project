@@ -414,6 +414,34 @@ backend/data/api_key.txt
 
 Do not commit this file.
 
+## Conversation Memory and Voice Replay
+
+Settings → Conversation includes two controls adapted from
+[cmh95209’s feature branch](https://github.com/cmh95209/Amadeus-Project/tree/cmh95-local-llm-and-features):
+
+- **Conversation memory (estimated tokens)**: defaults to 40,000; accepts 500–1,000,000.
+  Sends a recent slice of history instead of a fixed 80 messages. This is a rough,
+  multilingual history estimate, not a guarantee that the entire request fits your
+  model’s context window. Personality, timing, output instructions, and generated
+  responses need additional space. The newest message is always kept whole, even
+  if it exceeds the budget. Full conversation history remains in SQLite.
+- **Voice recordings to keep**: defaults to 100; accepts 1–10,000. The oldest saved
+  recordings are pruned after a new recording completes. The latest-recording copy
+  at `generated/generated.wav` is retained separately.
+
+New assistant replies have a **Replay voice** button, including after reloading the
+page. Completed audio is reused without another LLM or TTS call. If a recording has
+been pruned or playback was interrupted, GPT-SoVITS recreates it from the saved
+Japanese reply; regenerated audio may sound different. Prerecorded touch reactions
+also support replay and do not count toward the generated-recording limit.
+
+Existing chats are upgraded automatically without deleting their messages. Replies
+saved before this update have no Japanese voice text, so replay is unavailable for
+those older replies. OpenRouter remains the conversational provider.
+
+Settings are saved locally in `backend/data/conversation_settings.json`; generated
+recordings live in `backend/generated/voices/`. Neither is committed to Git.
+
 ## Active LLM Model
 
 The active model can be changed while Amadeus is running through the settings interface.

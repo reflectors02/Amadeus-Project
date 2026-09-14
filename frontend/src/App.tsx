@@ -3,6 +3,9 @@ import Live2DCharacter from "./components/Live2DCharacter";
 import type { Live2DCharacterHandle } from "./components/Live2DCharacter";
 import {
   getCurrentModel,
+  getConversationSettings,
+  saveConversationSettings,
+  messageAudioUrl,
   getPersonality,
   setPersonality,
   getApiKeyStatus,
@@ -19,6 +22,13 @@ import { interactions } from "./interactions";
 import type { InteractionName } from "./interactions";
 
 export default function App() {
+  const [contextBudget, setContextBudget] = useState("40000");
+  const [voiceRetention, setVoiceRetention] = useState("100");
+  const [conversationSettingsLoaded, setConversationSettingsLoaded] = useState(false);
+  const [conversationSaving, setConversationSaving] = useState(false);
+  const [conversationNotice, setConversationNotice] = useState("");
+  const [conversationError, setConversationError] = useState("");
+  const [replaying, setReplaying] = useState<number | null>(null);
   const [messages, setMessages] = useState<MemoryMessage[]>([]);
   const [input, setInput] = useState("");
   const [model, setModelName] = useState("");
@@ -30,7 +40,7 @@ export default function App() {
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsError, setSettingsError] = useState("");
   const [settingsNotice, setSettingsNotice] = useState("");
-  const [settingsSection, setSettingsSection] = useState<"connection" | "personality">("connection");
+  const [settingsSection, setSettingsSection] = useState<"connection" | "personality" | "conversation">("connection");
   const [personality, setPersonalityText] = useState("");
   const [savedPersonality, setSavedPersonality] = useState("");
   const [personalityLoading, setPersonalityLoading] = useState(true);
@@ -40,7 +50,7 @@ export default function App() {
   const [personalityNotice, setPersonalityNotice] = useState("");
   const [personalityReload, setPersonalityReload] = useState(0);
   const personalityDirty = personalityLoaded && personality !== savedPersonality;
-  const settingsBusy = savingSettings || personalitySaving;
+  const settingsBusy = savingSettings || personalitySaving || conversationSaving;
   const modalRef = useRef<HTMLDivElement>(null);
   const missingKey = hasApiKey === false;
   const idleStatus = status === "Online" || status === "Memory cleared" || status.startsWith("Model set to ");
@@ -71,6 +81,17 @@ export default function App() {
   useEffect(() => {
     if (!settingsOpen) return;
     let cancelled = false;
+    setConversationSettingsLoaded(false);
+    setConversationError("");
+    setConversationNotice("");
+    void getConversationSettings().then((settings) => {
+      if (cancelled) return;
+      setContextBudget(String(settings.context_budget));
+      setVoiceRetention(String(settings.voice_retention));
+      setConversationSettingsLoaded(true);
+    }).catch((error) => {
+      if (!cancelled) setConversationError(error instanceof Error ? error.message : "Could not load conversation settings");
+    });
     setPersonalityLoading(true);
     setPersonalityLoaded(false);
     setPersonalityError("");
@@ -104,6 +125,44 @@ export default function App() {
     window.addEventListener("beforeunload", warnBeforeLeaving);
     return () => window.removeEventListener("beforeunload", warnBeforeLeaving);
   }, [settingsOpen, personalityDirty]);
+
+  async function saveConversation() {
+    if (settingsBusy || !conversationSettingsLoaded) return;
+    const budget = Number(contextBudget);
+    const retention = Number(voiceRetention);
+    if (!Number.isInteger(budget) || budget < 500 || budget > 1000000 ||
+        !Number.isInteger(retention) || retention < 1 || retention > 10000) {
+      setConversationError("Use 500–1,000,000 for memory and 1–10,000 for recordings.");
+      return;
+    }
+    setConversationSaving(true);
+    setConversationError("");
+    setConversationNotice("");
+    try {
+      await saveConversationSettings({ context_budget: budget, voice_retention: retention });
+      setConversationNotice("Saved. Memory applies to your next reply; recordings are pruned after new audio completes.");
+    } catch (error) {
+      setConversationError(error instanceof Error ? error.message : "Could not save conversation settings");
+    } finally {
+      setConversationSaving(false);
+    }
+  }
+
+  async function replayVoice(message: MemoryMessage) {
+    if (!message.id || loading || replaying !== null) return;
+    setReplaying(message.id);
+    setStatus("Playing voice...");
+    try {
+      characterRef.current?.stopSpeech();
+      await characterRef.current?.prepareSpeech();
+      await characterRef.current?.playSpeech(messageAudioUrl(message.id));
+      setStatus("Online");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Voice replay failed");
+    } finally {
+      setReplaying(null);
+    }
+  }
 
   async function savePersonality() {
     if (settingsBusy || loading || !personalityLoaded || !personalityDirty || !personality.trim()) return;
@@ -148,7 +207,7 @@ export default function App() {
 
     const text = input.trim();
 
-    if (!text || loading) {
+    if (!text || loading || replaying !== null) {
       return;
     }
 
@@ -184,6 +243,8 @@ export default function App() {
         {
           role: "assistant",
           content: reply.response,
+          id: reply.messageId,
+          can_replay: Boolean(reply.speechUrl),
         },
       ]);
 
@@ -251,6 +312,7 @@ export default function App() {
   }
 
   async function clearMemory() {
+    if (loading || replaying !== null) return;
     const confirmed = window.confirm(
       "Clear Amadeus's conversation memory?"
     );
@@ -274,7 +336,7 @@ export default function App() {
   }
 
   async function handleInteraction(name: InteractionName) {
-    if (loading) return;
+    if (loading || replaying !== null) return;
 
     const interaction = interactions[name];
     const result = characterRef.current?.playMotion(interaction.motion) ?? "not-ready";
@@ -299,6 +361,8 @@ export default function App() {
         {
           role: "assistant",
           content: reply.response,
+          id: reply.messageId,
+          can_replay: Boolean(reply.speechUrl),
         },
       ]);
 
@@ -351,7 +415,7 @@ export default function App() {
                   className="touch-button"
                   style={interaction.position}
                   aria-label={interaction.label}
-                  disabled={loading}
+                  disabled={loading || replaying !== null}
                   onClick={() => void handleInteraction(name)}
                 >
                   {interaction.label}
@@ -400,6 +464,7 @@ export default function App() {
             <button
               className="ghost-button danger"
               onClick={clearMemory}
+              disabled={loading || replaying !== null}
             >
               Reset memory
             </button>
@@ -449,6 +514,27 @@ export default function App() {
               <div className="bubble">
                 {message.content}
               </div>
+              {message.role === "assistant" && message.id && message.can_replay && (
+                <button type="button" className="ghost-button replay-button"
+                  disabled={loading || replaying !== null}
+                  aria-label={`Replay voice for reply ${index + 1}`}
+                  title={replaying === message.id ? "Loading voice..." : "Replay voice"}
+                  aria-busy={replaying === message.id}
+                  onClick={() => void replayVoice(message)}>
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none"
+                    stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"
+                    aria-hidden="true" focusable="false">
+                    {replaying === message.id ? (
+                      <circle cx="12" cy="12" r="8" strokeDasharray="30 20" className="replay-spinner" />
+                    ) : (
+                      <>
+                        <path d="M11 5 6 9H3v6h3l5 4V5Z" />
+                        <path d="M15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14" />
+                      </>
+                    )}
+                  </svg>
+                </button>
+              )}
             </article>
           ))}
 
@@ -496,7 +582,7 @@ export default function App() {
 
           <button
             type="submit"
-            disabled={!input.trim() || loading}
+            disabled={!input.trim() || loading || replaying !== null}
           >
             Send
           </button>
@@ -570,6 +656,8 @@ export default function App() {
                 onClick={() => setSettingsSection("personality")}>
                 Personality{personalityDirty && <span className="unsaved-dot" aria-label="Unsaved changes" />}
               </button>
+              <button type="button" aria-pressed={settingsSection === "conversation"}
+                onClick={() => setSettingsSection("conversation")}>Conversation</button>
             </nav>
 
             <div hidden={settingsSection !== "connection"}>
@@ -625,6 +713,40 @@ export default function App() {
                 </button>
               </div>
             </div>
+
+            <section hidden={settingsSection !== "conversation"} aria-label="Conversation settings">
+              <label>
+                Conversation memory (estimated tokens)
+                <input type="number" min={500} max={1000000} step={1} value={contextBudget}
+                  disabled={!conversationSettingsLoaded || settingsBusy}
+                  onChange={(event) => { setContextBudget(event.target.value); setConversationNotice(""); }} />
+              </label>
+              <p className="settings-help">
+                Controls how much recent chat is sent with each reply. Smaller budgets can reduce cost.
+                Your full history stays saved. Personality instructions and the newest message can exceed this estimate.
+              </p>
+              <label>
+                Voice recordings to keep
+                <input type="number" min={1} max={10000} step={1} value={voiceRetention}
+                  disabled={!conversationSettingsLoaded || settingsBusy}
+                  onChange={(event) => { setVoiceRetention(event.target.value); setConversationNotice(""); }} />
+              </label>
+              <p className="settings-help">
+                Replay uses a saved recording when available. Older recordings are recreated from the saved
+                Japanese reply using GPT-SoVITS, so they may sound slightly different. Replies from before
+                this update cannot be replayed.
+              </p>
+              {conversationError && <p className="settings-error" role="alert">{conversationError}</p>}
+              {conversationNotice && <p className="settings-success" role="status">{conversationNotice}</p>}
+              <div className="modal-actions">
+                {!conversationSettingsLoaded && <button className="ghost-button"
+                  onClick={() => setPersonalityReload((value) => value + 1)}>Retry loading</button>}
+                <button className="primary-button" disabled={!conversationSettingsLoaded || settingsBusy || loading}
+                  onClick={() => void saveConversation()}>
+                  {conversationSaving ? "Saving..." : "Save conversation settings"}
+                </button>
+              </div>
+            </section>
 
             <section hidden={settingsSection !== "personality"} aria-label="Personality editor">
               <p className="personality-intro" id="personality-help">

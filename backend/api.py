@@ -15,6 +15,8 @@ from chat import (
 )
 
 from tts import streamVoiceChunks
+import memory as store
+import preferences
 
 import threading
 import uuid
@@ -25,7 +27,7 @@ from pathlib import Path
 application = Flask(__name__)
 CORS(application)
 
-_speech_requests: dict[str, tuple[float, str]] = {}
+_speech_requests: dict[str, tuple[float, str, int]] = {}
 _speech_requests_lock = threading.Lock()
 _reaction_audio_dir = Path(__file__).resolve().parent / "assets" / "reaction_audio"
 
@@ -80,15 +82,16 @@ def request_message():
     speech_id = uuid.uuid4().hex
     with _speech_requests_lock:
         now = time.monotonic()
-        for expired in [key for key, (created, _) in _speech_requests.items() if now - created > 300]:
+        for expired in [key for key, item in _speech_requests.items() if now - item[0] > 300]:
             _speech_requests.pop(expired, None)
-        _speech_requests[speech_id] = (now, pack.assistant_reply_JPS)
+        _speech_requests[speech_id] = (now, pack.assistant_reply_JPS, pack._message_id)
         while len(_speech_requests) > 20:
             _speech_requests.pop(next(iter(_speech_requests)))
 
     return jsonify({
         "response": pack.assistant_reply_ENG,
         "speech_id": speech_id,
+        "message_id": pack._message_id,
     })
 
 @application.route("/speech/<speech_id>", methods=["GET"])
@@ -101,7 +104,21 @@ def speech(speech_id):
     if item is None or time.monotonic() - item[0] > 300:
         return jsonify({"message": "Speech request not found"}), 404
 
-    chunks = streamVoiceChunks(item[1])
+    return _voice_response(item[2])
+
+
+def _voice_response(message_id):
+    voice = store.get_message_voice(message_id)
+    if not voice:
+        return jsonify({"message": "Message not found"}), 404
+    japanese, audio_url = voice
+    prefix = "assets/reaction_audio/"
+    if audio_url and audio_url.startswith(prefix):
+        return reaction_audio(audio_url[len(prefix):])
+    if not japanese:
+        return jsonify({"message": "This older reply has no saved Japanese audio text."}), 404
+    chunks = streamVoiceChunks(japanese, message_id=message_id,
+                               retention=preferences.load()["voice_retention"])
     try:
         first = next(chunks)
     except Exception:
@@ -117,6 +134,27 @@ def speech(speech_id):
     response = Response(generate(), mimetype="audio/wav")
     response.headers["Cache-Control"] = "no-store"
     response.call_on_close(chunks.close)
+    return response
+
+
+@application.route("/message_audio/<int:message_id>", methods=["GET"])
+def message_audio(message_id):
+    if request.method == "HEAD":
+        return "", 405
+    return _voice_response(message_id)
+
+
+@application.route("/conversation_settings", methods=["GET", "POST"])
+def conversation_settings():
+    try:
+        values = (preferences.save(request.get_json(silent=True))
+                  if request.method == "POST" else preferences.load())
+    except ValueError as error:
+        return jsonify({"message": str(error)}), 400
+    except OSError:
+        return jsonify({"message": "Could not access conversation settings."}), 500
+    response = jsonify(values)
+    response.headers["Cache-Control"] = "no-store"
     return response
 
 

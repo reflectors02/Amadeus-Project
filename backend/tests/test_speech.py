@@ -49,22 +49,25 @@ class SpeechTests(unittest.TestCase):
                 self.generator = generator
                 self.headers = {}
             def call_on_close(self, callback): self.close = callback
-        tickets = {'one': (time.monotonic(), 'test')}
+        tickets = {'one': (time.monotonic(), 'test', 1)}
         scope = dict(request=SimpleNamespace(method='GET'), _speech_requests=tickets,
                      _speech_requests_lock=threading.Lock(), time=time, chain=chain,
                      jsonify=lambda data: data, Response=Response,
-                     streamVoiceChunks=lambda text: (chunk for chunk in (b'header', b'pcm')))
-        exec(compile(ast.Module(body=[function], type_ignores=[]), 'api.py', 'exec'), scope)
+                     streamVoiceChunks=lambda text, **kwargs: (chunk for chunk in (b'header', b'pcm')))
+        voice = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == '_voice_response')
+        scope.update(store=SimpleNamespace(get_message_voice=lambda id: ('test', None)),
+                     preferences=SimpleNamespace(load=lambda: {'voice_retention': 100}))
+        exec(compile(ast.Module(body=[function, voice], type_ignores=[]), 'api.py', 'exec'), scope)
         response = scope['speech']('one')
         self.assertEqual(scope['speech']('one')[1], 404)
         self.assertEqual(b''.join(response.generator), b'headerpcm')
-        tickets['old'] = (time.monotonic() - 301, 'test')
+        tickets['old'] = (time.monotonic() - 301, 'test', 1)
         self.assertEqual(scope['speech']('old')[1], 404)
-        def fail(text):
+        def fail(text, **kwargs):
             raise RuntimeError('upstream failure')
             yield
         scope['streamVoiceChunks'] = fail
-        tickets['error'] = (time.monotonic(), 'test')
+        tickets['error'] = (time.monotonic(), 'test', 1)
         self.assertEqual(scope['speech']('error')[1], 502)
 
 

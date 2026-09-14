@@ -701,3 +701,40 @@ button {
   background: #b89a63;
   box-shadow: 0 0 7px rgba(184, 154, 99, 0.25);
 }
+
+.replay-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-top: 0.25rem;
+  padding: 0;
+  border-radius: 4px;
+  border: 1px solid rgba(203, 212, 223, 0.35);
+  background: transparent;
+  align-self: flex-start;
+}
+
+.replay-button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+
+.replay-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.replay-spinner {
+  transform-origin: center;
+  animation: replay-spin 0.8s linear infinite;
+}
+
+@keyframes replay-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .replay-spinner { animation: none; }
+}

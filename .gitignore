@@ -24,6 +24,7 @@ backend/data/api_key.txt
 # Persistent / generated runtime data
 backend/data/memory.db
 backend/data/memory.json
+backend/data/conversation_settings.json
 backend/generated/
 backend/ttsout/generated.wav
 

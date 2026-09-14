@@ -2,7 +2,11 @@ import os
 import json
 from typing import List, Dict
 import sqlite3
+import threading
+from contextlib import closing
 from datetime import datetime, timezone
+
+_schema_lock = threading.Lock()
 
 DATA_DIR = "data"
 
@@ -136,6 +140,12 @@ def load_internal_context(now: datetime | None = None) -> Dict[str, str]:
 # ---------- MEMORY (JSON list of messages) ---------- (SQL)
 
 def _ensure_messages_table(c: sqlite3.Cursor) -> None:
+    with _schema_lock:
+        _migrate_messages(c)
+        c.connection.commit()
+
+
+def _migrate_messages(c: sqlite3.Cursor) -> None:
     c.execute("""
         CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -145,6 +155,10 @@ def _ensure_messages_table(c: sqlite3.Cursor) -> None:
         )
     """)
 
+    columns = {row[1] for row in c.execute("PRAGMA table_info(messages)")}
+    for name in ("japanese", "audio_url"):
+        if name not in columns:
+            c.execute(f"ALTER TABLE messages ADD COLUMN {name} TEXT")
 
 
 # pre: raw_messages from load_memory_raw()
@@ -168,28 +182,40 @@ def load_memory_raw() -> List[Dict[str, str]]:
     conn.commit()
 
 
-    c.execute("SELECT role, content, created_at FROM messages ORDER BY id ASC")
+    c.execute("SELECT id, role, content, created_at, japanese, audio_url FROM messages ORDER BY id ASC")
     rows = c.fetchall()
 
     conn.close()
-    return [{"role": role, "content": content, "created_at": created_at} for role, content, created_at in rows]
+    return [{"id": id, "role": role, "content": content, "created_at": created_at,
+             "can_replay": bool(japanese or audio_url)}
+            for id, role, content, created_at, japanese, audio_url in rows]
 
 
 # pre: role is a string (e.g., "user", "assistant"), content is a string
 # post: a new row is inserted into messages with a correct auto-incremented id
 #       every other info e.g., created_at also must be correctly placed
-def append_message(_role: str, _content: str) -> None:
+def append_message(_role: str, _content: str, japanese=None, audio_url=None) -> int:
     conn = sqlite3.connect(PATH_TO_MEMORY)
     c = conn.cursor()
     _ensure_messages_table(c)
 
     c.execute(
-        "INSERT INTO messages (role, content) VALUES (?, ?)",
-        (_role, _content)
+        "INSERT INTO messages (role, content, japanese, audio_url) VALUES (?, ?, ?, ?)",
+        (_role, _content, japanese, audio_url)
     )
 
+    message_id = c.lastrowid
     conn.commit()
     conn.close()
+    return message_id
+
+
+def get_message_voice(message_id):
+    with closing(sqlite3.connect(PATH_TO_MEMORY)) as conn:
+        _ensure_messages_table(conn.cursor())
+        row = conn.execute("SELECT japanese, audio_url FROM messages WHERE id = ? AND role = 'assistant'",
+                           (message_id,)).fetchone()
+    return row
 
 # pre: SQLite database may exist or not; messages table may contain any number of rows
 # post: all rows in messages are deleted; table and schema remain intact; future inserts still work

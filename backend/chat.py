@@ -1,6 +1,7 @@
 import memory as store
 from llm import get_llm, reset_llm
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
+import preferences
 from chat_interactions import INTERACTION_EVENTS, INTERACTION_RESPONSES
 import random
 
@@ -70,6 +71,7 @@ def get_raw_memory():
 
 
 class AmadeusPack(BaseModel):
+    _message_id: int | None = PrivateAttr(default=None)
     assistant_reply_JPS: str = Field(..., description=(
         "PRIMARY response: Kurisu's dialogue written natively in Japanese, as she would actually speak it. "
         "Must be plain spoken Japanese for TTS."
@@ -149,12 +151,13 @@ def getOutputPacked(user_message: str) -> AmadeusPack:
     # Snapshot the previous turn before the new message becomes the latest one.
     internal_context = store.load_internal_context()
     store.append_message("user", user_message)
-    context = store.build_prompt_messages()[-80:]
+    context = preferences.trim_history(store.build_prompt_messages(), preferences.load()["context_budget"])
 
     pack = getResponsePacked(context, internal_context=internal_context)
 
     # Store what the user actually sees
-    store.append_message("assistant", pack.assistant_reply_ENG)
+    pack._message_id = store.append_message("assistant", pack.assistant_reply_ENG,
+                                            japanese=pack.assistant_reply_JPS)
     return pack
 
 
@@ -179,8 +182,8 @@ def SpecialInteraction(interaction_value: int) -> dict:
     variant = random.choice(response_variants)
     response = variant["text"]
     store.append_message("user", event)
-    store.append_message("assistant", response);    
-    return {"response": response, "audio_url": variant.get("audio_url")}
+    message_id = store.append_message("assistant", response, audio_url=variant.get("audio_url"))
+    return {"response": response, "audio_url": variant.get("audio_url"), "message_id": message_id}
 
 # pre:
 # - hourlu

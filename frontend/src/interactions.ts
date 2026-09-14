@@ -19,6 +19,13 @@ export const interactions = {
     // 15% x 7.5% corresponds to 90 x 60 design pixels.
     position: { top: "11%", left: "50%", width: "25%", height: "7.5%" },
   },
+
+  // poke:
+  // {
+  //   backendId: 3,
+  //   motion: "PokeReaction",
+  //   label: "Poke",
+  // }
 };
 
 export type InteractionName = keyof typeof interactions;

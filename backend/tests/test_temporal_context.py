@@ -57,7 +57,7 @@ class TemporalContextTests(unittest.TestCase):
                         and n.name == 'getOutputPacked')
         now = datetime(2026, 9, 6, 18, 42).astimezone()
         captures = []
-        reply = SimpleNamespace(assistant_reply_ENG='Welcome back.')
+        reply = SimpleNamespace(assistant_reply_ENG='Welcome back.', assistant_reply_JPS='おかえり。')
         def respond(context, internal_context):
             captures.append(internal_context['content'])
             self.assertEqual(context[-1], {'role': 'user', 'content': 'Hello again'})
@@ -68,7 +68,7 @@ class TemporalContextTests(unittest.TestCase):
             with store.sqlite3.connect(store.PATH_TO_MEMORY) as conn:
                 conn.execute("UPDATE messages SET created_at = '2026-09-06 14:10'")
             original_context = store.load_internal_context
-            scope = {'store': store, 'AmadeusPack': object, 'getResponsePacked': respond}
+            scope = {'preferences': SimpleNamespace(trim_history=lambda rows, budget: rows, load=lambda: {'context_budget': 40000}), 'store': store, 'AmadeusPack': object, 'getResponsePacked': respond}
             exec(compile(ast.Module(body=[function], type_ignores=[]), 'chat.py', 'exec'), scope)
             with patch.object(store, 'load_internal_context', side_effect=lambda: original_context(now)):
                 scope['getOutputPacked']('Hello again')

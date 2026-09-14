@@ -1,10 +1,13 @@
 export type MemoryMessage = {
+  id?: number;
+  can_replay?: boolean;
   role: string;
   content: string;
   created_at?: string;
 };
 
 export type MessageReply = {
+  messageId?: number;
   response: string;
   speechUrl?: string;
 };
@@ -72,6 +75,7 @@ export async function sendMessage(userInput: string): Promise<MessageReply> {
 
   return {
     response: data.response,
+    messageId: typeof data.message_id === "number" ? data.message_id : undefined,
     speechUrl:
       typeof data.speech_id === "string"
         ? `${API_BASE}/speech/${encodeURIComponent(data.speech_id)}`
@@ -138,10 +142,28 @@ export async function sendInteraction(interactionValue: number): Promise<Message
   if (typeof data.response !== "string") throw new Error("Invalid interaction response");
   return {
     response: data.response,
+    messageId: typeof data.message_id === "number" ? data.message_id : undefined,
     speechUrl:
       typeof data.audio_url === "string" &&
       data.audio_url.startsWith("/reaction_audio/")
         ? `${API_BASE}${data.audio_url}`
         : undefined,
   };
+}
+
+export function messageAudioUrl(id: number): string {
+  return `${API_BASE}/message_audio/${id}`;
+}
+
+export type ConversationSettings = { context_budget: number; voice_retention: number };
+
+export async function getConversationSettings(): Promise<ConversationSettings> {
+  return parseResponse(await fetch(`${API_BASE}/conversation_settings`, { cache: "no-store" }));
+}
+
+export async function saveConversationSettings(settings: ConversationSettings): Promise<ConversationSettings> {
+  return parseResponse(await fetch(`${API_BASE}/conversation_settings`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(settings),
+  }));
 }

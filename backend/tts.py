@@ -1,4 +1,5 @@
 import os
+import hashlib
 import platform
 import shutil
 import subprocess
@@ -115,11 +116,22 @@ def _stream_audio(text: str, play: bool):
             temp_path.unlink()
 
 
-def streamVoiceChunks(text: str):
+def streamVoiceChunks(text: str, message_id: int | None = None, retention: int = 100):
     """Yield GPT-SoVITS WAV chunks for browser playback while saving a copy."""
     with _speech_lock:
         OUT_WAV.parent.mkdir(parents=True, exist_ok=True)
-        temp_path = OUT_WAV.with_suffix(".browser.tmp")
+        cache_dir = OUT_WAV.parent / "voices"
+        fingerprint = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+        cached = cache_dir / f"{message_id}-{fingerprint}.wav" if message_id is not None else None
+        if cached is not None and cached.exists():
+            with cached.open("rb") as audio:
+                while chunk := audio.read(4096):
+                    yield chunk
+            return
+        if cached is not None:
+            cache_dir.mkdir(parents=True, exist_ok=True)
+        temp_path = (cached.with_suffix(".tmp") if cached is not None
+                     else OUT_WAV.with_suffix(".browser.tmp"))
 
         try:
             with requests.post(
@@ -135,7 +147,16 @@ def streamVoiceChunks(text: str):
                             continue
                         output.write(chunk)
                         yield chunk
-            temp_path.replace(OUT_WAV)
+            if cached is None:
+                temp_path.replace(OUT_WAV)
+            else:
+                temp_path.replace(cached)
+                # Preserve the legacy latest-recording copy for existing tools.
+                shutil.copyfile(cached, OUT_WAV)
+                recordings = sorted(cache_dir.glob("[0-9]*.wav"),
+                                    key=lambda path: path.stat().st_mtime, reverse=True)
+                for old in recordings[max(1, retention):]:
+                    old.unlink(missing_ok=True)
         finally:
             if temp_path.exists():
                 temp_path.unlink()
