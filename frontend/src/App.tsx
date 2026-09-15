@@ -62,7 +62,7 @@ export default function App() {
   const footerStatus = missingKey && idleStatus ? "No API key" : status;
 
   const version_name = "091426";
-  const is_developer_build = true;
+  const is_developer_build = false;
 
   const build = is_developer_build ? "Developer Build" : "Release Build";
 
