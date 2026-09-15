@@ -4,6 +4,7 @@ import MessageActions from "./components/MessageActions";
 import type { Live2DCharacterHandle } from "./components/Live2DCharacter";
 import {
   getCurrentModel,
+  setOnlineMode,
   getConversationSettings,
   saveConversationSettings,
   messageAudioUrl,
@@ -33,6 +34,9 @@ export default function App() {
   const [messages, setMessages] = useState<MemoryMessage[]>([]);
   const [input, setInput] = useState("");
   const [model, setModelName] = useState("");
+  const [webAccess, setWebAccess] = useState<boolean | null>(null);
+  const [webToggling, setWebToggling] = useState(false);
+  const webTogglePending = useRef(false);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("Connecting to Amadeus...");
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -51,7 +55,7 @@ export default function App() {
   const [personalityNotice, setPersonalityNotice] = useState("");
   const [personalityReload, setPersonalityReload] = useState(0);
   const personalityDirty = personalityLoaded && personality !== savedPersonality;
-  const settingsBusy = savingSettings || personalitySaving || conversationSaving;
+  const settingsBusy = savingSettings || personalitySaving || conversationSaving || webToggling;
   const modalRef = useRef<HTMLDivElement>(null);
   const missingKey = hasApiKey === false;
   const idleStatus = status === "Online" || status === "Memory cleared" || status.startsWith("Model set to ");
@@ -150,7 +154,7 @@ export default function App() {
   }
 
   async function replayVoice(message: MemoryMessage) {
-    if (!message.id || loading || replaying !== null) return;
+    if (!message.id || loading || webToggling || replaying !== null) return;
     setReplaying(message.id);
     setStatus("Playing voice...");
     try {
@@ -186,7 +190,11 @@ export default function App() {
     try {
       const [memory, currentModel, configured] = await Promise.all([
         getMemory(),
-        getCurrentModel(),
+        getCurrentModel().then((currentModel) => {
+          if (!currentModel.trim()) throw new Error("No model configured");
+          setWebAccess(currentModel.endsWith(":online"));
+          return currentModel;
+        }),
         getApiKeyStatus(),
       ]);
 
@@ -203,12 +211,45 @@ export default function App() {
     }
   }
 
+  async function toggleWebAccess() {
+    if (webTogglePending.current || loading || replaying !== null || settingsBusy || settingsOpen) return;
+    webTogglePending.current = true;
+    setWebToggling(true);
+    try {
+      if (webAccess === null) {
+        const currentModel = await getCurrentModel();
+        if (!currentModel.trim()) throw new Error("No model configured");
+        setModelName(currentModel);
+        setWebAccess(currentModel.endsWith(":online"));
+      } else {
+        const result = await setOnlineMode(!webAccess);
+        setWebAccess(result.online);
+        setModelName(result.model);
+      }
+      setStatus("Online");
+    } catch (error) {
+      // A lost response can follow a successful save. Reconcile before retrying.
+      try {
+        const currentModel = await getCurrentModel();
+        if (!currentModel.trim()) throw new Error("No model configured");
+        setWebAccess(currentModel.endsWith(":online"));
+        setModelName(currentModel);
+      } catch {
+        setWebAccess(null);
+      }
+      setStatus(error instanceof Error ? error.message : "Could not update web access");
+    } finally {
+      webTogglePending.current = false;
+      setWebToggling(false);
+    }
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
 
     const text = input.trim();
 
-    if (!text || loading || replaying !== null) {
+    if (!text || loading || webTogglePending.current || webToggling || replaying !== null) {
       return;
     }
 
@@ -299,6 +340,8 @@ export default function App() {
         setApiKeyInput("");
       }
       await setModel(nextModel);
+      setModelName(nextModel);
+      setWebAccess(nextModel.endsWith(":online"));
 
       setStatus(`Model set to ${nextModel}`);
       setSettingsNotice("Connection settings saved.");
@@ -314,7 +357,7 @@ export default function App() {
   }
 
   async function clearMemory() {
-    if (loading || replaying !== null) return;
+    if (loading || webToggling || replaying !== null) return;
     const confirmed = window.confirm(
       "Clear Amadeus's conversation memory?"
     );
@@ -338,7 +381,7 @@ export default function App() {
   }
 
   async function handleInteraction(name: InteractionName) {
-    if (loading || replaying !== null) return;
+    if (loading || webToggling || replaying !== null) return;
 
     const interaction = interactions[name];
     const result = characterRef.current?.playMotion(interaction.motion) ?? "not-ready";
@@ -418,7 +461,7 @@ export default function App() {
                   className="touch-button"
                   style={interaction.position}
                   aria-label={interaction.label}
-                  disabled={loading || replaying !== null}
+                  disabled={loading || webToggling || replaying !== null}
                   onClick={() => void handleInteraction(name)}
                 >
                   {interaction.label}
@@ -467,7 +510,7 @@ export default function App() {
             <button
               className="ghost-button danger"
               onClick={clearMemory}
-              disabled={loading || replaying !== null}
+              disabled={loading || webToggling || replaying !== null}
             >
               Reset memory
             </button>
@@ -518,7 +561,7 @@ export default function App() {
                 {message.content}
               </div>
               <MessageActions message={message}
-                busy={loading || replaying !== null}
+                busy={loading || webToggling || replaying !== null}
                 canRegenerate={message.role === "assistant" && index === messages.length - 1
                   && index > 0 && messages[index - 1].role === "user"}
                 onBusy={setLoading} onMessages={setMessages} onStatus={setStatus}
@@ -573,8 +616,23 @@ export default function App() {
           />
 
           <button
+            type="button"
+            className={`web-toggle${webAccess ? " on" : ""}`}
+            onClick={() => void toggleWebAccess()}
+            disabled={webToggling || loading || replaying !== null || settingsBusy || settingsOpen}
+            aria-pressed={webAccess === true}
+            aria-busy={webToggling}
+            title={webAccess === null ? "Retry loading web access status"
+              : webAccess ? "Web access is ON — searches may add cost and response time"
+              : "Web access is OFF — click to enable web search"}
+          >
+            <span className="web-toggle-globe" aria-hidden="true">🌐</span>
+            <span>{webToggling ? "Saving..." : webAccess === null ? "Web retry" : webAccess ? "Web on" : "Web off"}</span>
+          </button>
+
+          <button
             type="submit"
-            disabled={!input.trim() || loading || replaying !== null}
+            disabled={!input.trim() || loading || webToggling || replaying !== null}
           >
             Send
           </button>

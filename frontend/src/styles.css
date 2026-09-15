@@ -412,7 +412,7 @@ button {
   margin: 0 clamp(18px, 3vw, 48px) 12px;
   padding: 8px;
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 8px;
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 10px;
@@ -421,6 +421,7 @@ button {
 }
 
 .composer textarea {
+  min-width: 0;
   min-height: 46px;
   max-height: 150px;
   resize: none;
@@ -449,6 +450,40 @@ button {
 .composer button:disabled {
   opacity: 0.35;
   cursor: default;
+}
+
+/* Web toggle design from cmh95209/Amadeus-Project (MIT). */
+/* Web access toggle in the message composer */
+.composer .web-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #1a2230;
+  color: #8b96a9;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.composer .web-toggle:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.composer .web-toggle.on {
+  background: #17352a;
+  border-color: #2f9e6e;
+  color: #7fe0b0;
+}
+
+.composer .web-toggle { white-space: nowrap; }
+.composer .web-toggle:focus-visible { outline: 2px solid #7fe0b0; outline-offset: 2px; }
+@media (max-width: 480px) {
+  .composer { grid-template-columns: minmax(0, 1fr) auto; }
+  .composer textarea { grid-column: 1 / -1; }
+  .composer .web-toggle { justify-self: start; min-height: 44px; }
 }
 
 .modal-backdrop {

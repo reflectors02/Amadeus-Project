@@ -111,10 +111,23 @@ export async function resetMemory(): Promise<void> {
 }
 
 export async function getCurrentModel(): Promise<string> {
-  const response = await fetch(`${API_BASE}/getCurrLLMModel`);
+  const response = await fetch(`${API_BASE}/getCurrLLMModel`, { cache: "no-store" });
 
   const data = await parseResponse(response);
   return data.message ?? "";
+}
+
+export async function setOnlineMode(online: boolean): Promise<{ online: boolean; model: string }> {
+  const data = await parseResponse(await fetch(`${API_BASE}/toggleOnlineMode`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ online_flag: online ? 1 : 0 }),
+  }));
+  if (typeof data.online !== "boolean" || typeof data.model !== "string" ||
+      !data.model.trim() || data.online !== data.model.endsWith(":online")) {
+    throw new Error("Could not confirm web access. Check the backend and try again.");
+  }
+  return { online: data.online, model: data.model };
 }
 
 export async function setModel(model: string): Promise<void> {
