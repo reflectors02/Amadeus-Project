@@ -283,17 +283,22 @@ def doSpecialInteraction():
 #       return status ok at the end
 @application.route("/toggleOnlineMode", methods=["POST"])
 def toggleOnlineMode():
-    print("[Flask] /toggleOnlineMode triggered")
+    data = request.get_json(silent=True)
 
-    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return jsonify({"message": "Expected a JSON object."}), 400
 
-    online_flag = data.get("online_flag", 0)
+    online_flag = data.get("online_flag")
+
+    if type(online_flag) is not int or online_flag not in (0, 1):
+        return jsonify({"message": "online_flag must be 0 or 1."}), 400
 
     toggle_search_online(online_flag)
 
     return jsonify({
         "status": "ok",
-        "online": bool(online_flag)
+        "online": online_flag == 1,
+        "model": getLLMModel(),
     })
 
 

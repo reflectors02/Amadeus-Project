@@ -8,22 +8,19 @@ import random
 default_LLM_Model = store.DEFAULT_LLM_MODEL
 API_KEY = store.load_api_key()
 LLM_Model = store.load_llm_model(default_model=default_LLM_Model)
-LLM_Model_Online = LLM_Model + ":online"
 
 
 #   pre: The intended new_model is a string e.g., "deepseek/deepseek-v3.2-exp"
 #   post: global LLM_Model should be changed to new_model
 #         LLM_Model.txt should be updated accordingly, to store the latest model the user chose.
-#         should also change LLM_Model_Online accordingly
 def setLLMModel(new_model: str):
     global LLM_Model
-    global LLM_Model_Online
 
-    LLM_Model = new_model.strip()
-    LLM_Model_Online = LLM_Model + ":online"
-    
-    store.save_llm_model(LLM_Model)
-    reset_llm()  # IMPORTANT: recreate ChatOpenAI with the new model
+    new_model = new_model.strip()
+    store.save_llm_model(new_model)
+    LLM_Model = new_model
+    reset_llm()
+
     print("[Amadeus] Model changed to " + LLM_Model)
 
 
@@ -80,14 +77,17 @@ def get_raw_memory():
 #      else, untoggle online mode if 0. 
 # post: 
 #      accordingly set the online mode by setting the LLM model again
+#      before setting, it make sure we delete any trailing :online in LLM_Model
 def toggle_search_online(requested_flag: int):
+    # Remove existing suffixes, including accidental duplicates.
+    base_model = LLM_Model
+    while base_model.endswith(":online"):
+        base_model = base_model.removesuffix(":online")
+
     if requested_flag == 1:
-        store.save_llm_model(LLM_Model_Online)
-        print("[Amadeus] Toggled Online Mode to True")
+        setLLMModel(base_model + ":online")
     else:
-        store.save_llm_model(LLM_Model)
-        print("[Amadeus] Toggled Online Mode to False")
-    reset_llm()
+        setLLMModel(base_model)
 
 
 
