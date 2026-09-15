@@ -1,211 +1,43 @@
 # Amadeus
 
-Amadeus is a Steins;Gate-inspired AI character assistant designed to feel less like a conventional chatbot and more like a persistent virtual companion.
+A *Steins;Gate*-inspired AI companion with persistent conversation memory, Japanese speech, and an animated Live2D character.
 
-The project combines configurable large language models, persistent conversation history, customizable character behavior, bilingual dialogue generation, neural voice synthesis, and Live2D character rendering in a single interactive system.
+Amadeus brings together an OpenRouter-powered conversational model, local GPT-SoVITS voice synthesis, and a React WebUI. It began as a personal experiment and remains an actively developed project exploring personality, voice, and continuity in a virtual companion.
 
-Amadeus began as a small personal experiment inspired by *Steins;Gate*. It has since grown into a larger software project and a sandbox for experimenting with conversational AI, memory, speech synthesis, animated character interfaces, and long-running assistant behavior.
+**Latest: Release Build - 091426** · [Changelog](#changelog)
 
-The project is still actively evolving. It is not intended to be a finished product; it is an ongoing attempt to explore what happens when an AI character is given personality, voice, visual presence, and continuity over time.
+[Features](#features) · [Installation](#installation) · [Configuration](#configuration) · [Launching](#launching-amadeus) · [Updating](#updating-amadeus) · [Troubleshooting](#troubleshooting)
 
-![Amadeus Preview](docs/images/mainmenu.png)
+![Amadeus conversation interface](docs/images/mainmenu.png)
 
-![Amadeus Preview](docs/images/settings.png)
+<details>
+<summary>Settings preview</summary>
 
-## How Conversation and Voice Work
+![Amadeus settings](docs/images/settings.png)
 
-Amadeus currently separates the **text you read** from the **voice you hear**.
+</details>
 
-By default, you can chat with Kurisu in **English**.
+## Features
 
-For each normal response, Amadeus asks the LLM to produce two versions of the same reply in a single model call:
+- **Conversation:** persistent SQLite history, adjustable context budget, message editing and deletion, and response regeneration with version switching.
+- **Voice:** streamed Japanese speech, audio-driven lip sync, and replay of saved responses.
+- **Character:** Live2D idle and talking motions, touch reactions, and paired prerecorded interaction lines.
+- **Customization:** change the OpenRouter model and edit the character's personality from Settings.
+- **Web access:** enable or disable OpenRouter web search from the message composer.
+- **Startup:** macOS and Windows launchers start the voice server, backend, and WebUI together.
 
-- **English (`assistant_reply_ENG`)** — displayed in the conversation UI.
-- **Japanese (`assistant_reply_JPS`)** — natural spoken Japanese sent to GPT-SoVITS for voice synthesis.
+### Conversation and voice
 
-So a typical conversation looks like:
-
-```text
-You type in English
-        │
-        ▼
-      LLM
-        │
-        ├── English response ──► displayed in the WebUI
-        │
-        └── Japanese dialogue ─► GPT-SoVITS ─► Kurisu speaks Japanese
-```
+You can chat in English. In normal operation, one LLM call produces natural Japanese dialogue for GPT-SoVITS and an English translation for the conversation UI. Japanese is written first to improve the spoken response.
 
 > [!IMPORTANT]
-> ### Does Amadeus run a local LLM?
+> **Amadeus uses OpenRouter for its conversational LLM.** Bring your own API key and select a supported model in Settings. The LLM does not run on your GPU, and the project does not bundle a local LLM.
 >
-> **No — Amadeus currently uses OpenRouter for the conversational LLM.**
->
-> You provide your own OpenRouter API key and select which supported model you want Amadeus to use from the settings menu.
->
-> The LLM itself therefore does **not** run on your GPU.
->
-> What currently runs locally:
->
-> - **GPT-SoVITS** — Japanese voice synthesis
-> - **Live2D / Cubism** — character rendering and animation
-> - **Conversation history** — stored locally in SQLite
-> - **Amadeus frontend and backend**
->
-> What currently runs remotely:
->
-> - **LLM inference** — through OpenRouter
->
-> Amadeus does **not currently bundle or automatically install a local LLM.**
-> Local LLM support may be added in the future.
+> Voice synthesis, Live2D rendering, the frontend/backend, and SQLite history run locally. Conversation context is sent to OpenRouter to generate replies.
 
-## Current Status
+## Installation
 
-The current development version includes:
-
-- React + TypeScript browser interface
-- Python / Flask backend
-- Configurable LLM access through OpenRouter
-- Persistent SQLite conversation history
-- Runtime LLM model switching
-- GPT-SoVITS character voice synthesis
-- Live2D Cubism rendering directly in the WebUI
-- Natural looping idle and talking-body motions
-- Touch interactions with one-shot character reactions
-- Browser-side streamed speech playback
-- Audio-amplitude-driven Live2D lip synchronization
-- Paired text + prerecorded audio variants for special interactions
-- Cross-platform automatic launcher for macOS and Windows
-- Backend connection/status display
-- Conversation memory reset controls
-
-The Live2D character system now handles idle, talking, touch reactions, motion priority, and audio-driven mouth movement in the browser. Generated GPT-SoVITS speech is streamed through Flask to the WebUI, where the same audio signal sent to the speakers is analyzed to drive `ParamMouthOpenY`.
-
-Next major character-system work includes:
-
-- More expression and motion control from model responses
-- Richer hit-area and interaction behavior
-- Expanding the prerecorded interaction voice library
-- Improved prompting and character-state control
-- A future redesign of the long-term memory system
-
----
-
-# Architecture
-
-Amadeus is split into three main runtime components:
-
-```text
-┌─────────────────────────────────────────────┐
-│ React / TypeScript WebUI                    │
-│                                             │
-│  Chat UI          Live2D Cubism / WebGL    │
-└───────────────────────┬─────────────────────┘
-                        │ HTTP
-                        ▼
-┌─────────────────────────────────────────────┐
-│ Python / Flask Backend                      │
-│                                             │
-│  Chat   Memory   LLM   TTS API             │
-└───────────────┬─────────────────────────────┘
-                │
-                ▼
-┌─────────────────────────────────────────────┐
-│ GPT-SoVITS                                  │
-│ Character voice synthesis                   │
-└─────────────────────────────────────────────┘
-```
-
-Default local services:
-
-```text
-GPT-SoVITS        http://127.0.0.1:9880
-Amadeus backend   http://127.0.0.1:5050
-Amadeus WebUI     http://127.0.0.1:5173
-```
-
-The AI backend is intentionally independent from the frontend. This allowed the original Unity interface to be replaced by a browser-based React/WebGL frontend without rewriting the conversational core.
-
----
-
-# Project Structure
-
-```text
-Amadeus-Project/
-├── backend/
-│   ├── main.py
-│   ├── api.py
-│   ├── chat.py
-│   ├── memory.py
-│   ├── llm.py
-│   ├── tts.py
-│   ├── start_gptsovits.py
-│   ├── environment.yml
-│   ├── requirements.in
-│   ├── assets/
-│   └── data/
-│
-├── frontend/
-│   ├── cubism/
-│   │   ├── Core/
-│   │   └── Framework/
-│   ├── public/
-│   │   ├── cubism-shaders/
-│   │   ├── live2d/
-│   │   └── live2dcubismcore.min.js
-│   ├── src/
-│   │   ├── components/
-│   │   │   └── Live2DCharacter.tsx
-│   │   ├── live2d/
-│   │   │   ├── cubismBootstrap.ts
-│   │   │   ├── KurisuController.ts
-│   │   │   └── KurisuModel.ts
-│   │   ├── App.tsx
-│   │   ├── api.ts
-│   │   ├── main.tsx
-│   │   └── styles.css
-│   ├── index.html
-│   ├── package.json
-│   └── vite.config.ts
-│
-├── scripts/
-│   └── launcher.py
-│
-├── start_macos.command
-├── start_windows.bat
-├── README.md
-└── .gitignore
-```
-
-GPT-SoVITS is cloned separately into a local `GPT-SoVITS/` directory. It is an external dependency rather than part of the Amadeus repository itself.
-
----
-
-# Technology
-
-## Backend
-
-- Python
-- Flask
-- SQLite
-- OpenRouter
-- GPT-SoVITS
-
-## Frontend
-
-- React 19
-- TypeScript
-- Vite
-- WebGL
-- Live2D Cubism SDK for Web
-
-The Live2D runtime does not require users to install Cubism Editor or Unity. The required Web runtime files and shaders are included with the project frontend.
-
----
-
-# Installation
-
-## 0. Requirements
+### 0. Requirements
 
 Before installing Amadeus, make sure you have:
 
@@ -219,21 +51,19 @@ Before installing Amadeus, make sure you have:
 
 An NVIDIA GPU is strongly recommended for faster local voice synthesis, although CPU operation is possible.
 
-### Conda
+#### Conda
 
 Install Anaconda or Miniconda and make sure the `conda` command is available.
 
-### Node.js
+#### Node.js
 
 Install Node.js and npm. The browser WebUI uses Vite and React.
 
-### Windows
+#### Windows
 
 Install Visual Studio Build Tools if required by GPT-SoVITS or one of its Python dependencies.
 
----
-
-## 1. Clone Amadeus
+### 1. Clone Amadeus
 
 ```bash
 git clone https://github.com/reflectors02/Amadeus-Project.git
@@ -256,9 +86,7 @@ Amadeus-Project/
 └── GPT-SoVITS/      # external project, cloned locally
 ```
 
----
-
-## 2. Create the Amadeus Backend Environment
+### 2. Create the Amadeus Backend Environment
 
 From the repository root:
 
@@ -286,9 +114,7 @@ backend/environment.yml
 backend/requirements.in
 ```
 
----
-
-## 3. Create the GPT-SoVITS Environment
+### 3. Create the GPT-SoVITS Environment
 
 ```bash
 cd GPT-SoVITS
@@ -303,20 +129,21 @@ pip install -r extra-req.txt --no-deps
 pip install -r requirements.txt
 conda install ffmpeg
 ```
-### Initialize fast-langdetect
+
+#### Initialize fast-langdetect
 
 GPT-SoVITS uses `fast-langdetect` for language detection. If you encounter
 a missing model cache directory error, create the directory below.
 
 Run this while still inside the `GPT-SoVITS` directory.
 
-#### Windows
+##### Windows
 
 ```bat
 mkdir GPT_SoVITS\pretrained_models\fast_langdetect
 ```
 
-#### macOS / Linux
+##### macOS / Linux
 
 ```bash
 mkdir -p GPT_SoVITS/pretrained_models/fast_langdetect
@@ -328,13 +155,11 @@ Return to the Amadeus project root:
 cd ..
 ```
 
----
-
-## 4. Configure PyTorch
+### 4. Configure PyTorch
 
 The exact PyTorch installation depends on the machine running GPT-SoVITS.
 
-### NVIDIA GPU
+#### NVIDIA GPU
 
 Install the CUDA-enabled PyTorch build appropriate for your system.
 
@@ -348,7 +173,7 @@ pip install torch torchvision torchaudio --index-url https://download.pytorch.or
 
 Check the current PyTorch installation instructions if your CUDA environment requires a different build.
 
-### CPU Only
+#### CPU Only
 
 A CPU-only configuration is also possible, although synthesis will be slower.
 
@@ -360,9 +185,7 @@ pip uninstall -y torch torchvision torchaudio torchcodec
 pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cpu
 ```
 
----
-
-## 5. Download GPT-SoVITS Pretrained Models
+### 5. Download GPT-SoVITS Pretrained Models
 
 Install Git LFS if necessary:
 
@@ -384,9 +207,7 @@ GPT-SoVITS/GPT_SoVITS/pretrained_models/
 
 The exact files required can vary with GPT-SoVITS versions, so Amadeus should only be paired with a GPT-SoVITS version known to work with the project.
 
----
-
-## 6. Install Frontend Dependencies
+### 6. Install Frontend Dependencies
 
 The automatic launcher runs `npm install` if `frontend/node_modules/` is missing.
 
@@ -400,134 +221,77 @@ cd ..
 
 No separate Live2D or Cubism installation is required for the WebUI. The Cubism Web runtime, framework source, shaders, and model assets used by Amadeus are part of the project frontend.
 
----
+## Configuration
 
-# Configuration
+### OpenRouter and model selection
 
-## OpenRouter API Key
+Open **Settings → Connection** to enter your OpenRouter API key and choose a model. You can change the active model without restarting Amadeus. The API key is saved locally in `backend/data/api_key.txt`; do not commit it.
 
-The OpenRouter API key is stored locally in:
+### Web access
 
-```text
-backend/data/api_key.txt
-```
+Use **Web on / Web off** beside the message composer to toggle OpenRouter web search. The setting is saved with the selected model and restored on restart. Web searches can add cost and response time. If the state cannot be confirmed, the button displays **Web retry**.
 
-Do not commit this file.
+### Personality
 
-## Conversation Memory and Voice Replay
+Open **Settings → Personality** to edit the character's instructions. Saved changes apply to the next message and keep your conversation history intact.
 
-Settings → Conversation includes two controls adapted from
-[cmh95209’s feature branch](https://github.com/cmh95209/Amadeus-Project/tree/cmh95-local-llm-and-features):
+### Conversation memory and voice replay
 
-- **Conversation memory (estimated tokens)**: defaults to 40,000; accepts 500–1,000,000.
-  Sends a recent slice of history instead of a fixed 80 messages. This is a rough,
-  multilingual history estimate, not a guarantee that the entire request fits your
-  model’s context window. Personality, timing, output instructions, and generated
-  responses need additional space. The newest message is always kept whole, even
-  if it exceeds the budget. Full conversation history remains in SQLite.
-- **Voice recordings to keep**: defaults to 100; accepts 1–10,000. The oldest saved
-  recordings are pruned after a new recording completes. The latest-recording copy
-  at `generated/generated.wav` is retained separately.
+Open **Settings → Conversation** to adjust:
 
-New assistant replies have a **Replay voice** button, including after reloading the
-page. Completed audio is reused without another LLM or TTS call. If a recording has
-been pruned or playback was interrupted, GPT-SoVITS recreates it from the saved
-Japanese reply; regenerated audio may sound different. Prerecorded touch reactions
-also support replay and do not count toward the generated-recording limit.
+| Setting | Default | Range | Purpose |
+| --- | --- | --- | --- |
+| Conversation memory (estimated tokens) | 40,000 | 500–1,000,000 | Sets the approximate budget for recent history sent to the model. |
+| Voice recordings to keep | 100 | 1–10,000 | Limits saved generated recordings; older recordings are pruned as new ones complete. |
 
-Existing chats are upgraded automatically without deleting their messages. Replies
-saved before this update have no Japanese voice text, so replay is unavailable for
-those older replies. OpenRouter remains the conversational provider.
+The history budget is a rough multilingual estimate. Personality, timing, output instructions, and the response require additional context space. The newest message is kept whole even if it exceeds the budget; full history remains in SQLite.
 
-Settings are saved locally in `backend/data/conversation_settings.json`; generated
-recordings live in `backend/generated/voices/`. Neither is committed to Git.
+**Replay voice** reuses completed recordings without another LLM or TTS call. If a recording was pruned or interrupted, GPT-SoVITS recreates it from the saved Japanese reply, so it may sound different. Replies saved before Japanese voice text was stored cannot be replayed. Prerecorded touch reactions support replay and do not count toward the generated-recording limit.
 
-## Active LLM Model
+Settings are saved in `backend/data/conversation_settings.json`, and recordings in `backend/generated/voices/`. The latest-recording copy at `generated/generated.wav` is retained separately.
 
-The active model can be changed while Amadeus is running through the settings interface.
+Conversation settings and message controls were adapted from [cmh95209's feature branch](https://github.com/cmh95209/Amadeus-Project/tree/cmh95-local-llm-and-features).
 
-The backend exposes model-control endpoints including:
+## Launching Amadeus
 
-```text
-/setLLMModel
-/getCurrLLMModel
-```
+After installation, use the launcher for your platform. It starts GPT-SoVITS, Flask, and the WebUI, waits for each service, and opens the browser.
 
----
+### macOS
 
-# Launching Amadeus
-
-Amadeus includes a shared Python launcher used by the macOS and Windows startup scripts.
-
-The launcher:
-
-1. Checks for Conda, npm, and required project files.
-2. Clears stale Amadeus listeners from ports `9880`, `5050`, and `5173`.
-3. Installs frontend dependencies if `frontend/node_modules/` is missing.
-4. Starts GPT-SoVITS in the `GPTSoVits` Conda environment.
-5. Waits for the voice server to become available.
-6. Starts the Flask backend.
-7. Waits for the backend to become available.
-8. Starts the React/Vite frontend.
-9. Waits for the WebUI to become available.
-10. Opens Amadeus automatically in the default browser.
-11. Shuts down launcher-owned processes when the launcher exits.
-
-Runtime logs are written locally to:
-
-```text
-.runtime/logs/
-```
-
-The `.runtime/` directory is ignored by Git.
-
----
-
-## macOS
-
-The first time you clone or copy the project, make the launcher executable:
+Make the launcher executable the first time:
 
 ```bash
 chmod +x start_macos.command
 ```
 
-Then run:
+Then double-click `start_macos.command` in Finder or run:
 
 ```bash
 ./start_macos.command
 ```
 
-or double-click `start_macos.command` in Finder.
+### Windows
 
-The launcher opens Amadeus automatically once all services are ready.
-
-Press `Ctrl+C` in the launcher terminal to shut down the complete stack.
-
----
-
-## Windows
-
-Double-click:
-
-```text
-start_windows.bat
-```
-
-or run it from Command Prompt:
+Double-click `start_windows.bat` or run it from Command Prompt:
 
 ```bat
 start_windows.bat
 ```
 
-The Windows launcher uses the same underlying startup sequence as the macOS launcher.
+Press `Ctrl+C` in the launcher terminal to stop the stack. Runtime logs are saved in `.runtime/logs/`. The launcher also clears stale Amadeus listeners and runs `npm install` when frontend dependencies are missing.
 
----
+| Service | Default address |
+| --- | --- |
+| GPT-SoVITS | http://127.0.0.1:9880 |
+| Flask backend | http://127.0.0.1:5050 |
+| WebUI | http://127.0.0.1:5173 |
 
-# Manual Startup
+<details>
+<summary>Manual startup for development and debugging</summary>
 
-Manual startup is mainly useful for development and debugging.
+Run each service in a separate terminal, starting from the repository root.
 
-## GPT-SoVITS
+**GPT-SoVITS**
 
 ```bash
 conda activate GPTSoVits
@@ -535,13 +299,7 @@ cd backend
 python start_gptsovits.py
 ```
 
-GPT-SoVITS normally listens on:
-
-```text
-http://127.0.0.1:9880
-```
-
-## Backend
+**Backend**
 
 ```bash
 conda activate amadeus
@@ -549,98 +307,16 @@ cd backend
 python main.py
 ```
 
-The backend listens on:
-
-```text
-http://127.0.0.1:5050
-```
-
-## Frontend
+**Frontend**
 
 ```bash
 cd frontend
 npm run dev
 ```
 
-The frontend normally listens on:
+</details>
 
-```text
-http://127.0.0.1:5173
-```
-
----
-
-# Live2D WebUI
-
-Amadeus now renders its character directly in the browser using the official Live2D Cubism SDK for Web.
-
-The current rendering path is:
-
-```text
-Live2DCharacter.tsx
-        │
-        ▼
-KurisuController.ts
-        │
-        ▼
-KurisuModel.ts
-        │
-        ├── model3.json
-        ├── moc3
-        ├── textures
-        └── WebGL shaders
-        │
-        ▼
-Live2D Cubism Framework + Core
-        │
-        ▼
-WebGL canvas
-```
-
-Runtime model assets are stored under:
-
-```text
-frontend/public/live2d/
-```
-
-WebGL shader files are served from:
-
-```text
-frontend/public/cubism-shaders/WebGL/
-```
-
-The Cubism Core runtime is loaded from:
-
-```text
-frontend/public/live2dcubismcore.min.js
-```
-
-The project previously experimented with a Pixi-based Live2D integration. That approach was removed in favor of direct use of the current official Cubism Web SDK.
-
-## Character Motion and Lip Sync
-
-The browser-side character system now separates body motion from mouth motion.
-
-- `MotionPlayer.ts` manages looping `Idle` and `Talk` states plus higher-priority one-shot reactions.
-- `SpeechPlayer.ts` plays streamed audio in the browser and measures the actual waveform with the Web Audio API.
-- The measured amplitude is smoothed and applied to `ParamMouthOpenY`.
-- Touch reactions can interrupt the talking-body loop without stopping lip sync.
-- When a reaction finishes, the character returns to `Talk` if audio is still playing, otherwise `Idle`.
-
-The current Kurisu motion set includes a longer natural idle, a subtle talking-body loop, a head-pat reaction, and special touch reactions.
-
-Prerecorded interaction lines are stored under:
-
-```text
-backend/assets/reaction_audio/
-```
-
-and are served through Flask to the same browser audio/lip-sync path used by generated speech.
-
-
----
-
-# Updating Amadeus
+## Updating Amadeus
 
 Pull the latest project changes:
 
@@ -648,7 +324,7 @@ Pull the latest project changes:
 git pull origin main
 ```
 
-## Update Backend Environment
+### Update Backend Environment
 
 ```bash
 conda activate amadeus
@@ -657,7 +333,7 @@ conda env update -f environment.yml --prune
 cd ..
 ```
 
-## Update Frontend
+### Update Frontend
 
 ```bash
 cd frontend
@@ -665,7 +341,7 @@ npm install
 cd ..
 ```
 
-## Update GPT-SoVITS
+### Update GPT-SoVITS
 
 Only update GPT-SoVITS when Amadeus is known to support the newer version:
 
@@ -676,34 +352,10 @@ pip install -r requirements.txt
 cd ..
 ```
 
----
+## Troubleshooting
 
-# Runtime Data and Secrets
-
-The following are local runtime data and should not be committed:
-
-```text
-backend/data/api_key.txt
-backend/data/memory.db
-backend/generated/
-.runtime/
-frontend/node_modules/
-GPT-SoVITS/
-```
-
-Conversation history is stored locally in:
-
-```text
-backend/data/memory.db
-```
-
-Deleting this database removes the locally stored conversation history.
-
----
-
-# Common Issues
-
-## Launcher says a port is already in use
+<details>
+<summary>Launcher says a port is already in use</summary>
 
 The launcher attempts to clear stale Amadeus listeners from:
 
@@ -721,9 +373,10 @@ If a port cannot be cleared, inspect:
 
 The backend intentionally uses port `5050` rather than `5000` to avoid conflicts with macOS services that commonly use port 5000.
 
----
+</details>
 
-## macOS says `start_macos.command` cannot be executed
+<details>
+<summary>macOS says start_macos.command cannot be executed</summary>
 
 Run:
 
@@ -733,9 +386,10 @@ chmod +x start_macos.command
 
 and try again.
 
----
+</details>
 
-## Amadeus cannot connect to the backend
+<details>
+<summary>Amadeus cannot connect to the backend</summary>
 
 Check that the backend is available at:
 
@@ -749,9 +403,10 @@ When running the full launcher, inspect:
 .runtime/logs/backend.log
 ```
 
----
+</details>
 
-## Amadeus has no voice
+<details>
+<summary>Amadeus has no voice</summary>
 
 Check that GPT-SoVITS is available at:
 
@@ -765,9 +420,10 @@ Also verify that the required pretrained models exist under:
 GPT-SoVITS/GPT_SoVITS/pretrained_models/
 ```
 
----
+</details>
 
-## Live2D character does not appear
+<details>
+<summary>Live2D character does not appear</summary>
 
 Check the browser developer console and verify that the model reaches the expected loading stages:
 
@@ -790,9 +446,10 @@ and that the model assets exist under:
 frontend/public/live2d/
 ```
 
----
+</details>
 
-## `Shader program is not initialized`
+<details>
+<summary>Shader program is not initialized</summary>
 
 The Cubism Web renderer loads shader files asynchronously. A warning during the initial frames can occur while the shaders are loading.
 
@@ -800,9 +457,10 @@ If the character eventually renders, this initial warning is not fatal.
 
 Persistent shader compile errors usually indicate that the shader files are not being served from the expected public path.
 
----
+</details>
 
-## Frontend dependencies are missing
+<details>
+<summary>Frontend dependencies are missing</summary>
 
 Run:
 
@@ -813,9 +471,10 @@ npm install
 
 The automatic launcher also performs this step if `node_modules/` does not exist.
 
----
+</details>
 
-## Backend dependencies are missing or outdated
+<details>
+<summary>Backend dependencies are missing or outdated</summary>
 
 Run:
 
@@ -825,9 +484,10 @@ cd backend
 conda env update -f environment.yml --prune
 ```
 
----
+</details>
 
-## Resetting Conversation Memory
+<details>
+<summary>Resetting Conversation Memory</summary>
 
 Back up the database first if you want to preserve the conversation history.
 
@@ -845,273 +505,113 @@ del backend\data\memory.db
 
 Restart Amadeus afterward. A new database will be created automatically.
 
----
+</details>
 
-# Development Roadmap
+## Development
 
-Short-term priorities:
+The frontend and backend are independent, allowing the interface to evolve without rewriting the conversational core.
 
-```text
-Live2D static rendering       ✓
-Live2D model scaling          ✓
-Cubism shader integration     ✓
-Idle motion                   ✓
-Cubism physics                ✓
-Touch interaction             ✓
-Special touch reactions       ✓
-Talking-body motion           ✓
-Browser streamed speech       ✓
-Audio-driven lip sync         ✓
-Prerecorded interaction audio ✓
-frontend personality editing  ✓
-Improved Temporal awareness   ✓
-Poke interactions (stomach)   planned
-Prompting improvements        planned (high priority)
-Expression control            planned (very low priority)
-More/improved animations      planned (require hiring animator)
-Memory redesign               later
-```
+| Component | Technology | Location |
+| --- | --- | --- |
+| Backend | Python, Flask, SQLite, OpenRouter | `backend/` |
+| WebUI | React 19, TypeScript, Vite | `frontend/` |
+| Character | Live2D Cubism SDK for Web, WebGL | `frontend/src/live2d/` |
+| Voice synthesis | GPT-SoVITS native API v2 | `GPT-SoVITS/` (cloned separately) |
+| Launcher | Shared Python startup script | `scripts/launcher.py` |
 
-Longer-term ideas include richer character interaction, additional activities such as chess, and eventually hosting Amadeus as a web service where multiple users can run independent sessions.
+<details>
+<summary>Live2D and audio implementation</summary>
 
----
+`Live2DCharacter.tsx` connects the React interface to `KurisuController.ts` and `KurisuModel.ts`. The official Cubism Web runtime loads the model, textures, and shaders directly in the browser; Unity and Cubism Editor are not required.
 
-# Changelog
+- `MotionPlayer.ts` manages looping idle/talk states and higher-priority one-shot reactions.
+- `SpeechPlayer.ts` plays streamed audio and measures its waveform with the Web Audio API. Smoothed amplitude drives `ParamMouthOpenY`.
+- Touch reactions can interrupt the body animation while lip sync continues. After a reaction, the character returns to talk or idle according to playback state.
 
-## Interactive Live2D, Lip Sync, and Voiced Reactions — September 5, 2026
+| Asset | Path |
+| --- | --- |
+| Character models | `frontend/public/live2d/` |
+| WebGL shaders | `frontend/public/cubism-shaders/WebGL/` |
+| Cubism Core | `frontend/public/live2dcubismcore.min.js` |
+| Prerecorded reactions | `backend/assets/reaction_audio/` |
 
-### Natural Character Motions
+</details>
 
-Expanded the Live2D motion system beyond basic rendering:
+### Local data
 
-- Replaced the short mechanical idle with a longer, subtler loop using breathing, irregular blinking, small eye movement, and restrained arm/hair motion.
-- Added a dedicated head-pat reaction with eye closing, blush, and small relaxed movement.
-- Added a looping talking-body motion that intentionally leaves mouth opening under audio control.
-- Added motion priority and automatic return to the correct baseline state after reactions.
+Keep API keys, conversation history, generated audio, and runtime files out of source control:
 
-### Browser Speech + Audio-Driven Lip Sync
+- `backend/data/api_key.txt`
+- `backend/data/memory.db`
+- `backend/data/conversation_settings.json`
+- `backend/generated/`
+- `.runtime/`
+- `frontend/node_modules/`
+- `GPT-SoVITS/`
 
-Speech playback moved into the browser so Live2D can react to the exact audio being heard.
+### Roadmap
 
-```text
-GPT-SoVITS
-    ↓
-Flask /speech/<speech_id>
-    ↓
-SpeechPlayer.ts
-    ├── browser playback
-    └── Web Audio analyser
-             ↓
-        RMS amplitude
-             ↓
-      ParamMouthOpenY
-```
+- Improve prompting and character-state behavior (high priority).
+- Add more hit-area interactions, including stomach pokes.
+- Expand the prerecorded voice library and improve animations as resources allow.
+- Explore expression control (low priority) and a future long-term memory redesign.
 
-The talking-body motion and mouth motion are independent, allowing Kurisu to continue lip syncing while a higher-priority touch reaction is playing.
+Longer-term ideas include activities such as chess and a hosted version with independent user sessions. APIs, dependencies, and project structure may change as development continues.
 
-### Interaction Voice Lines
+## Changelog
 
-Special interactions now pair displayed text and optional recordings as one response variant so the visible reply, saved memory entry, and audio stay synchronized.
+### Release Build - 091426
 
-Prerecorded reaction voice lines are stored under:
+**Web access and conversation controls**
 
-```text
-backend/assets/reaction_audio/
-```
+- Added a composer button for OpenRouter web search, with on/off, saving, and retry states.
+- Connected the toggle to the active model and saved selection, preserving web access across restarts and handling duplicate `:online` suffixes.
+- Added message editing, deletion, response regeneration, and switching between response versions.
+- Added configurable conversation-history and saved-voice limits, plus replay of assistant responses.
+- Improved the message toolbar and frontend/backend request handling, including CORS fixes.
+- Incorporated conversation features adapted from [cmh95209](https://github.com/cmh95209/Amadeus-Project/tree/cmh95-local-llm-and-features).
 
-and use the same browser playback and lip-sync path as generated GPT-SoVITS speech.
+<details>
+<summary>Previous releases</summary>
 
----
+### Release Build - 090826
 
-## Native GPT-SoVITS Streaming TTS — September 5, 2026
+**Japanese-first dialogue**
 
-### Native API v2 Integration
+- Changed response generation to write Japanese dialogue first and then produce its English translation, improving naturalness for voice synthesis.
 
-Replaced the Gradio `/get_tts_wav` path with GPT-SoVITS's native REST API v2.
+### Release Build - 090526
 
-The backend now connects to:
+**Streaming speech and interactive Live2D**
 
-```text
-http://127.0.0.1:9880/tts
-```
+- Moved to GPT-SoVITS native API v2 on port `9880` for incremental speech generation.
+- Added browser-side streamed playback and audio-driven lip synchronization.
+- Expanded idle and talking motions, head-pat and special-touch reactions, and motion priority with automatic return to idle/talk.
+- Paired interaction text with prerecorded voice variants so replies, memory, and playback stay consistent.
 
-and requests `streaming_mode=1`, allowing GPT-SoVITS to return Japanese audio fragments while the response is still being synthesized.
+### Release Build - 090426
 
-### Continuous Audio Playback
+**Official Cubism Web integration**
 
-`backend/tts.py` now:
+- Integrated the official Live2D Cubism SDK into the React frontend.
+- Added browser model loading, character positioning, textures, and WebGL shaders.
+- Replaced the earlier Pixi-based rendering approach.
 
-- Sends the reference audio and Japanese prompt configuration to the native API.
-- Consumes the chunked WAV response incrementally.
-- Feeds all chunks into one continuous `ffplay` or `mpv` process.
-- Preserves a complete `generated/generated.wav` copy after streaming.
-- Falls back to saving and playing the completed file when no streaming player is installed.
+### Release Build - 090326
 
-Reference paths are resolved relative to `backend/`, including:
+**WebUI migration and automatic launchers**
 
-```text
-backend/assets/reference_audio/kurisu10s.wav
-```
+- Replaced the Unity interface with a React + TypeScript WebUI.
+- Added shared macOS/Windows startup, service readiness checks, browser opening, logs, and process cleanup.
+- Reorganized the project into `backend/`, `frontend/`, and `scripts/`.
+- Moved Flask to port `5050` to avoid common macOS port conflicts.
 
-### Backend Pipeline Change
+</details>
 
-The Flask message route starts `streamVoice()` in a background thread and returns the English response immediately. Japanese audio begins when the first native API chunk arrives instead of waiting for the entire response.
+Older development history is available in the [commit history](https://github.com/reflectors02/Amadeus-Project/commits/main/).
 
-### Launcher Update
-
-`backend/start_gptsovits.py` now starts `api_v2.py`. The automatic launcher waits on port `9880` and uses the `GPTSoVITS` Conda environment.
-
-A standalone test on the Mac CPU received its first audio chunk after approximately 2.7 seconds and completed in approximately 4.17 seconds.
-
----
-
-## Live2D Cubism Web Integration — September 4, 2026
-
-### Official Cubism SDK Integration
-
-Integrated the current official Live2D Cubism SDK for Web directly into the React frontend.
-
-The WebUI now loads:
-
-- Cubism Core
-- Cubism Framework
-- `.model3.json` model configuration
-- `.moc3` model data
-- Live2D texture assets
-- WebGL shaders
-
-A dedicated Live2D layer was added under:
-
-```text
-frontend/src/live2d/
-```
-
-with separate responsibilities for framework initialization, model loading, WebGL rendering, resize handling, and the animation loop.
-
-### Character Rendering
-
-The Live2D character now renders directly inside the browser without Unity and without the previous Pixi Live2D integration.
-
-Character scale and screen positioning are controlled by the Cubism projection matrix rather than by a Unity scene.
-
-### Shader Pipeline
-
-The current Cubism SDK loads GLSL shader files dynamically. The required shaders are exposed through Vite's public directory under:
-
-```text
-frontend/public/cubism-shaders/WebGL/
-```
-
-### Frontend Cleanup
-
-Removed the need for the abandoned Pixi-based Live2D renderer and simplified the frontend around the official Cubism SDK.
-
----
-
-## Automatic Launcher + Project Reorganization — September 3, 2026
-
-### Automatic Startup
-
-Added cross-platform launchers:
-
-```text
-start_macos.command
-start_windows.bat
-```
-
-Both use:
-
-```text
-scripts/launcher.py
-```
-
-The launcher starts GPT-SoVITS, the Flask backend, and the WebUI automatically, waits for each service to become ready, opens the browser, writes runtime logs, and cleans up stale Amadeus processes during development restarts.
-
-### Backend Port Change
-
-The Flask backend moved from port `5000` to port `5050` to avoid macOS Control Center / AirPlay conflicts.
-
-### Repository Reorganization
-
-The project was reorganized into a clearer layout:
-
-```text
-backend/
-frontend/
-scripts/
-```
-
-Backend modules were renamed to describe their responsibilities directly:
-
-```text
-api.py
-chat.py
-memory.py
-llm.py
-tts.py
-start_gptsovits.py
-```
-
-Runtime data, generated files, frontend dependencies, and secrets are excluded from source control.
-
----
-
-## WebUI Migration — September 3, 2026
-
-Development began on replacing the original Unity frontend with a React + TypeScript browser interface.
-
-Initial WebUI features included:
-
-- Conversation display
-- Sending messages to the Flask backend
-- Loading stored conversation history
-- Runtime LLM model selection
-- Conversation memory reset
-- Backend connection/status display
-- Responsive browser-based interface
-- Dedicated character viewport
-
-The backend remained independent from the frontend, allowing the user interface to be replaced without rewriting the conversational core.
-
----
-
-## Model Control + Backend Stability — December 20, 2025
-
-### Runtime LLM Model Switching
-
-Added support for changing the active LLM model while Amadeus is running.
-
-Users can enter a model identifier such as:
-
-```text
-deepseek/deepseek-chat-v3-0324
-```
-
-and apply it without restarting the backend.
-
-### Frontend ↔ Flask Model API
-
-Implemented:
-
-```text
-/setLLMModel
-/getCurrLLMModel
-```
-
-These endpoints provide the interface between the frontend and the Python backend for runtime model selection.
-
----
-
-# Notes
-
-Amadeus is a personal experimental project under active development. APIs, model formats, dependencies, and project structure may change as the system evolves.
-
----
-
-# License
+## License
 
 Original Amadeus project code is licensed under the [MIT License](LICENSE).
 
-Third-party components and assets—including the Live2D Cubism SDK, character
-models, artwork, voice recordings, and model weights—are not covered by this
-MIT license and remain subject to their respective licenses and permissions.
+Third-party components and assets—including the Live2D Cubism SDK, character models, artwork, voice recordings, and model weights—are not covered by this MIT license and remain subject to their respective licenses and permissions.
