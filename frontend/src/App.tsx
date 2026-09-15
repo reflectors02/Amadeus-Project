@@ -61,6 +61,12 @@ export default function App() {
   const idleStatus = status === "Online" || status === "Memory cleared" || status.startsWith("Model set to ");
   const footerStatus = missingKey && idleStatus ? "No API key" : status;
 
+  const version_name = "091426";
+  const is_developer_build = false;
+
+  const build = is_developer_build ? "Developer Build" : "Release Build";
+
+
   function closeSettings() {
     if (settingsBusy) return;
     if (personalityDirty && !window.confirm("Discard your unsaved personality changes?")) return;
@@ -639,7 +645,7 @@ export default function App() {
         </form>
         <div className="build-label">
           <span className="build-dot" aria-hidden="true" />
-          RELEASE BUILD
+          {build} - {version_name}
         </div>
       </section>
 
