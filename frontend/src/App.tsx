@@ -639,7 +639,7 @@ export default function App() {
         </form>
         <div className="build-label">
           <span className="build-dot" aria-hidden="true" />
-          DEVELOPER BUILD
+          RELEASE BUILD
         </div>
       </section>
 
