@@ -42,6 +42,14 @@ export const interactions = {
     motion: "PokeReaction",
     label: "Poke_arm_right",
     position: { top: "58%", left: "67%", width: "5%", height: "40%" },
+  },
+
+  belly_rub:
+  {
+    backendId: 5,
+    motion: "PokeReaction",
+    label: "belly_rub",
+    position: { top: "65%", left: "50%", width: "25%", height: "15%" },
   }
 
 };
