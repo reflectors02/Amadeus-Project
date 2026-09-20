@@ -49,6 +49,11 @@ Before installing Amadeus, make sure you have:
 - Python 3.10 for GPT-SoVITS
 - Visual Studio Build Tools on Windows if required by GPT-SoVITS dependencies
 
+https://visualstudio.microsoft.com/downloads/?q=build+tools
+Scroll down to you see Tools for Visual Studio
+Download Build Tools for Visual Studio 2026
+
+
 An NVIDIA GPU is strongly recommended for faster local voice synthesis, although CPU operation is possible.
 
 #### Conda
