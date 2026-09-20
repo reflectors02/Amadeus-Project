@@ -39,34 +39,42 @@ You can chat in English. In normal operation, one LLM call produces natural Japa
 
 ### 0. Requirements
 
-Before installing Amadeus, make sure you have:
+The setup uses the following tools. Install Git, Git LFS, Conda, Node.js, and the Windows Build Tools before continuing; Python and FFmpeg are covered in step 3.
 
-- Git
-- Conda / Anaconda / Miniconda
-- Node.js + npm
-- Git LFS
-- FFmpeg
-- Python 3.10 for GPT-SoVITS
-- Visual Studio Build Tools on Windows if required by GPT-SoVITS dependencies
+| Requirement | Used for |
+| --- | --- |
+| Git and Git LFS | Downloading the project and pretrained model files. |
+| Conda (Anaconda or Miniconda) | Managing separate Python environments for Amadeus and GPT-SoVITS. |
+| Node.js and npm | Running the React WebUI. |
+| Python 3.10 | Running GPT-SoVITS; installed through Conda in step 3. |
+| FFmpeg | Audio processing; installed through Conda in step 3. |
+| Visual Studio C++ Build Tools (Windows) | Compiling Python dependencies that require native C/C++ extensions. |
 
-https://visualstudio.microsoft.com/downloads/?q=build+tools
-Scroll down to you see Tools for Visual Studio
-Download Build Tools for Visual Studio 2026
+You will also need an **OpenRouter API key** for conversations. An NVIDIA GPU is strongly recommended for faster local voice synthesis; CPU operation is possible but slower.
 
+#### Windows: install the C++ Build Tools
 
-An NVIDIA GPU is strongly recommended for faster local voice synthesis, although CPU operation is possible.
+Install these before the GPT-SoVITS dependencies to avoid missing-compiler errors:
 
-#### Conda
+1. Open the [Visual Studio downloads page](https://visualstudio.microsoft.com/downloads/?q=build+tools).
+2. Under **Tools for Visual Studio**, download **Build Tools for Visual Studio**.
+3. Run the installer and select **Desktop development with C++**. Keep the recommended MSVC compiler tools and Windows SDK selected.
+4. Complete the installation. Restart Windows if the installer requests it, then reopen your terminal before continuing.
 
-Install Anaconda or Miniconda and make sure the `conda` command is available.
+If Build Tools is already installed, open **Visual Studio Installer → Modify** and check that the C++ workload is selected. Installing only the installer or the VS Code C/C++ extension does not install the compiler toolchain. See [Microsoft's C++ installation guide](https://learn.microsoft.com/en-us/cpp/build/vscpp-step-0-installation) for details.
 
-#### Node.js
+#### Before running commands
 
-Install Node.js and npm. The browser WebUI uses Vite and React.
+Use a terminal where `conda`, `git`, `node`, and `npm` are available. On Windows, Anaconda Prompt is a convenient option.
 
-#### Windows
+Amadeus uses two separate Conda environments:
 
-Install Visual Studio Build Tools if required by GPT-SoVITS or one of its Python dependencies.
+| Environment | Purpose |
+| --- | --- |
+| `amadeus` | Flask backend and conversation logic. |
+| `GPTSoVits` | Local voice synthesis and its dependencies. |
+
+Run the steps below in order and pay attention to the active environment. Unless a step says otherwise, start from the `Amadeus-Project` root directory.
 
 ### 1. Clone Amadeus
 
@@ -127,15 +135,15 @@ conda create -n GPTSoVits python=3.10
 conda activate GPTSoVits
 ```
 
-Install GPT-SoVITS dependencies:
+Install GPT-SoVITS dependencies **inside the `GPTSoVits` environment**:
 
 ```bash
-pip install -r extra-req.txt --no-deps
-pip install -r requirements.txt
+python -m pip install -r extra-req.txt --no-deps
+python -m pip install -r requirements.txt
 conda install ffmpeg
 ```
 
-#### Initialize fast-langdetect
+#### If needed: create the language-detection cache directory
 
 GPT-SoVITS uses `fast-langdetect` for language detection. If you encounter
 a missing model cache directory error, create the directory below.
@@ -172,8 +180,8 @@ Example:
 
 ```bash
 conda activate GPTSoVits
-pip uninstall -y torch torchvision torchaudio
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+python -m pip uninstall -y torch torchvision torchaudio
+python -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 ```
 
 Check the current PyTorch installation instructions if your CUDA environment requires a different build.
@@ -186,8 +194,8 @@ Example:
 
 ```bash
 conda activate GPTSoVits
-pip uninstall -y torch torchvision torchaudio torchcodec
-pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+python -m pip uninstall -y torch torchvision torchaudio torchcodec
+python -m pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cpu
 ```
 
 ### 5. Download GPT-SoVITS Pretrained Models
@@ -198,13 +206,15 @@ Install Git LFS if necessary:
 git lfs install
 ```
 
-Clone the pretrained model repository somewhere temporary:
+Clone the pretrained model repository into a separate temporary folder from the Amadeus project root:
 
 ```bash
-git clone https://huggingface.co/lj1995/GPT-SoVITS
+git clone https://huggingface.co/lj1995/GPT-SoVITS GPT-SoVITS-pretrained
 ```
 
-Copy the required pretrained files into:
+Using a different folder name avoids a collision with the GPT-SoVITS source folder created in step 1.
+
+Copy the required pretrained files from `GPT-SoVITS-pretrained/` into:
 
 ```text
 GPT-SoVITS/GPT_SoVITS/pretrained_models/
@@ -351,13 +361,46 @@ cd ..
 Only update GPT-SoVITS when Amadeus is known to support the newer version:
 
 ```bash
+conda activate GPTSoVits
 cd GPT-SoVITS
 git pull origin main
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 cd ..
 ```
 
 ## Troubleshooting
+
+<details>
+<summary>Windows: Microsoft Visual C++ is required or a dependency fails to compile</summary>
+
+Follow the [C++ Build Tools setup](#windows-install-the-c-build-tools), including the **Desktop development with C++** workload. Complete the installation, reopen your terminal, and retry the dependency installation from the GPT-SoVITS folder:
+
+```bash
+conda activate GPTSoVits
+python -m pip install -r extra-req.txt --no-deps
+python -m pip install -r requirements.txt
+```
+
+Read the first compiler or package error if installation still fails; a failed wheel build can have causes other than missing Build Tools.
+
+</details>
+
+<details>
+<summary>GPT-SoVITS reports a missing Python module</summary>
+
+Make sure the dependencies were installed in `GPTSoVits`, rather than `base` or `amadeus`. From the Amadeus project root:
+
+```bash
+conda activate GPTSoVits
+cd GPT-SoVITS
+python -m pip install -r extra-req.txt --no-deps
+python -m pip install -r requirements.txt
+python -m pip check
+```
+
+Check the installation output for errors before relaunching. Creating a Conda environment alone does not install GPT-SoVITS dependencies.
+
+</details>
 
 <details>
 <summary>Launcher says a port is already in use</summary>
@@ -492,9 +535,9 @@ conda env update -f environment.yml --prune
 </details>
 
 <details>
-<summary>Resetting Conversation Memory</summary>
+<summary>Resetting conversation memory</summary>
 
-Back up the database first if you want to preserve the conversation history.
+Stop Amadeus first, then back up `backend/data/memory.db` if you want to preserve your conversation history. Run the following command from the project root to delete the stored history.
 
 macOS/Linux:
 
@@ -565,7 +608,7 @@ Longer-term ideas include activities such as chess and a hosted version with ind
 
 ## Changelog
 
-### Release Build - 091426
+### 9/14/2026 -> Release Build - 091426
 
 **Web access and conversation controls**
 
@@ -579,13 +622,13 @@ Longer-term ideas include activities such as chess and a hosted version with ind
 <details>
 <summary>Previous releases</summary>
 
-### Release Build - 090826
+### 9/8/2026 -> Release Build - 090826
 
 **Japanese-first dialogue**
 
 - Changed response generation to write Japanese dialogue first and then produce its English translation, improving naturalness for voice synthesis.
 
-### Release Build - 090526
+### 9/5/2026 -> Release Build - 090526
 
 **Streaming speech and interactive Live2D**
 
@@ -594,7 +637,7 @@ Longer-term ideas include activities such as chess and a hosted version with ind
 - Expanded idle and talking motions, head-pat and special-touch reactions, and motion priority with automatic return to idle/talk.
 - Paired interaction text with prerecorded voice variants so replies, memory, and playback stay consistent.
 
-### Release Build - 090426
+### 9/4/2026 -> Release Build - 090426
 
 **Official Cubism Web integration**
 
@@ -602,7 +645,7 @@ Longer-term ideas include activities such as chess and a hosted version with ind
 - Added browser model loading, character positioning, textures, and WebGL shaders.
 - Replaced the earlier Pixi-based rendering approach.
 
-### Release Build - 090326
+### 9/3/2026 -> Release Build - 090326
 
 **WebUI migration and automatic launchers**
 
@@ -620,3 +663,4 @@ Older development history is available in the [commit history](https://github.co
 Original Amadeus project code is licensed under the [MIT License](LICENSE).
 
 Third-party components and assets—including the Live2D Cubism SDK, character models, artwork, voice recordings, and model weights—are not covered by this MIT license and remain subject to their respective licenses and permissions.
+
