@@ -702,7 +702,7 @@ button {
   position: absolute;
   transform: translate(-50%, -50%);
   z-index: 10;
-  background: transparent;
+  background: red;
   border: none;
   border-radius: 12px;
   color: transparent;

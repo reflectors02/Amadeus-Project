@@ -25,6 +25,12 @@
         {
           "File": "KurisuTalkingBase.motion3.json"
         }
+      ],
+
+      "PokeReaction": [
+        {
+          "File": "KurisuPoke.motion3.json"
+        }
       ]
     },
     "Physics": "kurisu.physics.json",

@@ -3,7 +3,8 @@
 INTERACTION_EVENTS = {
     1: "[Interaction event: The user touched your chest.]",
     2: "[Interaction event: The user patted your head.]",
-    3: "[Interaction event: The user tapped your arm.]",
+    3: "[Interaction event: The user tickled your neck!]",
+    4: "[Interaction event: The user tapped your arm.]",
 }
 
 INTERACTION_RESPONSES = {
@@ -35,9 +36,25 @@ INTERACTION_RESPONSES = {
 
     ],
     3: [
-        {"text": "You could just say my name.", "audio_url": None},
-        {"text": "Hey! I'm right here.", "audio_url": None},
-        {"text": "What's up?", "audio_url": None},
+        {"text": "Mm—hey, that tickles.", "audio_url": None},  # んっ……ちょっと、くすぐったいんだけど。
+        {"text": "You could just say my name.", "audio_url": None},  # 名前を呼べばいいでしょ。
+        {"text": "You startled me... What is it?", "audio_url": None},  # びっくりした……どうしたの？
+        {"text": "Honestly... I was trying to think.", "audio_url": None},  # もう……今、考え事してたのに。
+        {"text": "Was that reaction really so entertaining?", "audio_url": None},  # 今の反応、そんなに面白かった？
+        {"text": "If you want my attention, you could just ask.", "audio_url": None},  # 構ってほしいなら、そう言えばいいのに。
+        {"text": "My neck's ticklish... Watch where you're touching.", "audio_url": None},  # 首はくすぐったいんだから……触る場所、気をつけてよ。
+        {"text": "I'm not upset. You just caught me off guard.", "audio_url": None},  # 別に怒ってないわよ。ちょっとびっくりしただけ。
+    ],
+
+    4: [
+        {"text": "Hm? What is it?", "audio_url": None},  # ん？どうしたの？
+        {"text": "You could just call my name.", "audio_url": None},  # 名前を呼べばいいでしょ。
+        {"text": "Yes, yes. I'm listening.", "audio_url": None},  # はいはい、聞いてるわよ。
+        {"text": "What's with the poking?", "audio_url": None},  # さっきから、何つついてるの？
+        {"text": "There's no button there, you know.", "audio_url": None},  # そこにボタンなんてないわよ。
+        {"text": "Need something, or are you just bored?", "audio_url": None},  # 何か用？それとも、暇なだけ？
+        {"text": "All right, you have my attention. What is it?", "audio_url": None},  # わかった、ちゃんと聞くから。どうしたの？
+        {"text": "You really can't sit still, can you?", "audio_url": None},  # ほんと、落ち着きがないわね。
     ],
 }
 
