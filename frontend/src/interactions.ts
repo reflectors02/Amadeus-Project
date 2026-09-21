@@ -20,10 +20,10 @@ export const interactions = {
     position: { top: "10.5%", left: "50%", width: "25%", height: "10.5%" },
   },
 
-  poke_neck: // I'm gonna change this to tickle_neck later. but now is poke, very gentle!
+  poke_neck: 
   {
     backendId: 3,
-    motion: "PokeReaction",
+    motion: "NeckTickleReaction",
     label: "Poke_neck",
     position: { top: "30%", left: "50%", width: "10%", height: "4.5%" },
   },
@@ -47,7 +47,7 @@ export const interactions = {
   belly_rub:
   {
     backendId: 5,
-    motion: "PokeReaction",
+    motion: "BellyRubReaction",
     label: "belly_rub",
     position: { top: "65%", left: "50%", width: "25%", height: "15%" },
   }

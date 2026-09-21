@@ -31,6 +31,18 @@
         {
           "File": "KurisuPoke.motion3.json"
         }
+      ],
+    
+      "NeckTickleReaction": [
+        {
+          "File": "KurisuNeckTickle.motion3.json"
+        }
+      ],
+
+      "BellyRubReaction": [
+        {
+          "File": "KurisuBellyRub.motion3.json"
+        }
       ]
     },
     "Physics": "kurisu.physics.json",
