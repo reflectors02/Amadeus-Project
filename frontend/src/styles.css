@@ -722,7 +722,7 @@ button {
   padding: 0 clamp(18px, 3vw, 48px) 12px;
   color: #818c9d;
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 9px;
+  font-size: 12.5px;
   line-height: 16px;
   letter-spacing: 0.16em;
   pointer-events: none;
