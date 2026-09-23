@@ -61,8 +61,8 @@ export default function App() {
   const idleStatus = status === "Online" || status === "Memory cleared" || status.startsWith("Model set to ");
   const footerStatus = missingKey && idleStatus ? "No API key" : status;
 
-  const version_name = "092126";
-  const is_developer_build = true;
+  const version_name = "092326";
+  const is_developer_build = false;
 
   const build = is_developer_build ? "Developer Build" : "Release Build";
 
