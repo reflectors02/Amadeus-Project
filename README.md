@@ -1,5 +1,15 @@
 # Amadeus
 
+> [!IMPORTANT]
+> **As of November 26, 2026, main development of Amadeus has moved to [Amadeus-L](https://github.com/cmh95209/Amadeus-L).** 
+> New features, installers and updates are released there. This repository is kept as the
+> original version and is no longer under active development, until further notice.
+>
+> The new Amadeus-L build offers much more features, such as a built-in local model and ChatGPT support, automated installer, multilingual support, trust and relationship system, improved voice engine, comprehensive web search, image and video capabilities, emoji/GIF/Sticker system, overhauled UI/UX and much more.
+>
+> **→ Get the latest version: [github.com/cmh95209/Amadeus-L/releases](https://github.com/cmh95209/Amadeus-L/releases)**
+>
+> If you are a user of the original Amadeus app, please download and use the latest version.
 A *Steins;Gate*-inspired AI companion with persistent conversation memory, Japanese speech, and an animated Live2D character.
 
 Amadeus brings together an OpenRouter-powered conversational model, local GPT-SoVITS voice synthesis, and a React WebUI. It began as a personal experiment and remains an actively developed project exploring personality, voice, and continuity in a virtual companion.
